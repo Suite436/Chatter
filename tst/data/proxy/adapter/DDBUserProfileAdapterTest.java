@@ -4,7 +4,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -19,8 +22,8 @@ import data.structure.UserProfile;
 public class DDBUserProfileAdapterTest {
     
     private static final String TEST_USER_ID = "TestUser";
-    private static final String LOCATION_ATTRIBUTE_NAME = "location";
-    private static final String LOCATION_ATTRIBUTE_VALUE = "New York, NY";
+    private static final PreferenceCategory PREFERENCE_CATEGORY_TO_USE = PreferenceCategory.BOOKS;
+    private static final String PREFERENCE_ID = "Lord of the Rings";
     
     private UserProfile testProfile;
     private Item testModel;
@@ -31,13 +34,17 @@ public class DDBUserProfileAdapterTest {
      */
     @Before
     public void setup() {
-        Map<String, String> attributes = new HashMap<String, String>();
-        attributes.put(UserProfile.getNormalizedAttributeString(LOCATION_ATTRIBUTE_NAME),
-                UserProfile.getNormalizedAttributeString(LOCATION_ATTRIBUTE_VALUE));
-        testProfile = new UserProfile(TEST_USER_ID, attributes);
+        Map<String, Set<String>> dbPreferences = new HashMap<String, Set<String>>();
+        dbPreferences.put(PREFERENCE_CATEGORY_TO_USE.name(), new HashSet<String>());
+        dbPreferences.get(PREFERENCE_CATEGORY_TO_USE.name()).add(PREFERENCE_ID);
+        
+        Map<PreferenceCategory, Set<String>> preferences = new HashMap<PreferenceCategory, Set<String>>();
+        preferences.put(PREFERENCE_CATEGORY_TO_USE, new HashSet<String>());
+        preferences.get(PREFERENCE_CATEGORY_TO_USE).add(PREFERENCE_ID);
+        testProfile = new UserProfile(TEST_USER_ID, preferences);
         testModel = new Item()
-                .withPrimaryKey(DDBUserProfileAdapter.USER_ID_ATTRIBUTE, TEST_USER_ID).withMap(
-                        DDBUserProfileAdapter.ATTRIBUTE_MAP_ATTRIBUTE, attributes);
+                .withPrimaryKey(DDBUserProfileAdapter.USER_ID_ATTRIBUTE, TEST_USER_ID).with(
+                        DDBUserProfileAdapter.PREFERENCE_MAP_ATTRIBUTE, dbPreferences);
     }
     
     /**
@@ -84,6 +91,7 @@ public class DDBUserProfileAdapterTest {
     /**
      * Tests the conversion of a UserProfile object to a DynamoDB model.
      */
+    @SuppressWarnings("unchecked")
     @Test
     public void testToDBModel() {
         DDBUserProfileAdapter adapter = new DDBUserProfileAdapter().withObject(testProfile);
@@ -93,9 +101,13 @@ public class DDBUserProfileAdapterTest {
                 testModel.getString(DDBUserProfileAdapter.USER_ID_ATTRIBUTE),
                 result.getString(DDBUserProfileAdapter.USER_ID_ATTRIBUTE));
         
-        assertEquals("The returned Item did not have the expected attributes!",
-                testModel.getMap(DDBUserProfileAdapter.ATTRIBUTE_MAP_ATTRIBUTE),
-                result.getMap(DDBUserProfileAdapter.ATTRIBUTE_MAP_ATTRIBUTE));
+        for (Entry<String, Object> entry : testModel.getMap(
+                DDBUserProfileAdapter.PREFERENCE_MAP_ATTRIBUTE).entrySet()) {
+            Set<String> dbPreferences = (Set<String>) result.getMap(
+                    DDBUserProfileAdapter.PREFERENCE_MAP_ATTRIBUTE).get(entry.getKey());
+            assertEquals("The returned Item did not have the expected preferences!",
+                    entry.getValue(), dbPreferences);
+        }
     }
     
     /**
@@ -109,7 +121,7 @@ public class DDBUserProfileAdapterTest {
         assertEquals("The returned UserProfile did not have the expected ID!", testProfile.getId(),
                 result.getId());
         
-        assertEquals("The returned UserProfile did not have the expected attributes!",
-                testProfile.getAttributes(), result.getAttributes());
+        assertEquals("The returned UserProfile did not have the expected preferences!",
+                testProfile.getPreferences(), result.getPreferences());
     }
 }

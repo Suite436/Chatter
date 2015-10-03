@@ -2,18 +2,22 @@ package data.structure;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+
+import data.proxy.adapter.PreferenceCategory;
 
 /**
  * UserProfile represents a user, containing all user metadata.
  */
 public class UserProfile {
     private final String id;
-    private final Map<String, String> attributes;
+    private final Map<PreferenceCategory, Set<String>> preferences;
     
     /**
-     * Constructor requires id, but not attributes.
+     * Constructor requires id, but not preferences.
      * 
      * @param id
      */
@@ -22,20 +26,20 @@ public class UserProfile {
     }
     
     /**
-     * Constructor requires non-null id and can take attributes.
+     * Constructor requires non-null id and can take preferences.
      * 
      * @param id
-     * @param attributes
+     * @param preferences
      * @throws IllegalArgumentException if id is null
      */
-    public UserProfile(String id, Map<String, String> attributes) {
+    public UserProfile(String id, Map<PreferenceCategory, Set<String>> preferences) {
         if (id == null) {
             throw new IllegalArgumentException("ID cannot be null!");
         }
         this.id = id;
-        this.attributes = new HashMap<String, String>();
-        if (attributes != null) {
-            setAttributes(attributes);
+        this.preferences = new HashMap<PreferenceCategory, Set<String>>();
+        if (preferences != null) {
+            addAllPreferences(preferences);
         }
     }
     
@@ -49,72 +53,70 @@ public class UserProfile {
     }
     
     /**
-     * Sets the value of the specified attribute.
+     * Adds a preference for the user.
      * 
-     * @param attributeId
-     * @param attributeValue
+     * @param category
+     * @param preferenceId
      */
-    public void setAttribute(String attributeId, String attributeValue) {
-        validateAttribute(attributeId, attributeValue);
-        this.attributes.put(getNormalizedAttributeString(attributeId),
-                getNormalizedAttributeString(attributeValue));
-    }
-    
-    /**
-     * Sets all attributes in the passed-in Map.
-     * 
-     * @param attributes
-     */
-    public void setAttributes(Map<String, String> attributes) {
-        for (Entry<String, String> attribute : attributes.entrySet()) {
-            setAttribute(attribute.getKey(), attribute.getValue());
+    public void addPreference(PreferenceCategory category, String preferenceId) {
+        validatePreference(category, preferenceId);
+        if (!this.preferences.containsKey(category)) {
+            this.preferences.put(category, new HashSet<String>());
         }
+        this.preferences.get(category).add(preferenceId);
     }
     
     /**
-     * Gets the value of the specified attribute, or null if the user does not have a value set for
-     * this attribute.
+     * Removes the specified preference.
      * 
-     * @param attributeId
-     * @return attribute value or null
+     * @param category
+     * @param preferenceId
      */
-    public String getAttribute(String attributeId) {
-        return this.attributes.get(getNormalizedAttributeString(attributeId));
-    }
-    
-    /**
-     * Returns an unmodifiable version of the user's attributes.
-     * 
-     * @return unmodifiable version of the user's attributes
-     */
-    public Map<String, String> getAttributes() {
-        return Collections.unmodifiableMap(this.attributes);
-    }
-    
-    /**
-     * Returns the intersection between the attributes of the two users.
-     * 
-     * @param otherUser
-     * @return intersection as Map
-     * @throws IllegalArgumentException if otherUser is null
-     */
-    public Map<String, String> getAttributeIntersection(UserProfile otherUser) {
-        if (otherUser == null) {
-            throw new IllegalArgumentException("Other User Profile cannot be null!");
-        }
-        Map<String, String> intersection = new HashMap<String, String>();
-        for (Entry<String, String> myAttribute : this.attributes.entrySet()) {
-            String attributeId = myAttribute.getKey();
-            String attributeValue = myAttribute.getValue();
-            if (attributeValue.equals(otherUser.getAttribute(attributeId))) {
-                intersection.put(attributeId, attributeValue);
+    public void removePreference(PreferenceCategory category, String preferenceId) {
+        validatePreference(category, preferenceId);
+        if (this.preferences.containsKey(category)) {
+            Set<String> preferences = this.preferences.get(category);
+            if (preferences != null) {
+                preferences.remove(preferenceId);
             }
         }
-        return intersection;
     }
     
     /**
-     * Override of Object.equals(), based on user ID.
+     * Adds all supplied preferences for the user.
+     * 
+     * @param preferences
+     */
+    public void addAllPreferences(Map<PreferenceCategory, Set<String>> preferences) {
+        for (Entry<PreferenceCategory, Set<String>> preferenceCategory : preferences.entrySet()) {
+            PreferenceCategory category = preferenceCategory.getKey();
+            for (String preference : preferenceCategory.getValue()) {
+                addPreference(category, preference);
+            }
+        }
+    }
+    
+    /**
+     * Gets the user's preferences in the specified category, or null if none exist.
+     * 
+     * @param category
+     * @return preferences
+     */
+    public Set<String> getPreferencesForCategory(PreferenceCategory category) {
+        return this.preferences.get(category);
+    }
+    
+    /**
+     * Returns an unmodifiable version of the user's preferences.
+     * 
+     * @return unmodifiable version of the user's preferences
+     */
+    public Map<PreferenceCategory, Set<String>> getPreferences() {
+        return Collections.unmodifiableMap(this.preferences);
+    }
+    
+    /**
+     * Override of Object.equals(), based solely on user ID.
      * 
      * @param obj candidate for equality
      * @return boolean for equality
@@ -139,40 +141,19 @@ public class UserProfile {
     }
     
     /**
-     * Validates a set of attributes
+     * Validates a preference.
      * 
-     * @param attributes
+     * @param category
+     * @param preferenceId
+     * @throws IllegalArgumentException if the category or preference ID is invalid.
      */
-    private void validateAttributes(Map<String, String> attributes) {
-        for (Entry<String, String> attribute : attributes.entrySet()) {
-            validateAttribute(attribute.getKey(), attribute.getValue());
+    private void validatePreference(PreferenceCategory category, String preferenceId) {
+        if (category == null) {
+            throw new IllegalArgumentException("The category cannot be null!");
         }
-    }
-    
-    /**
-     * Validates an attribute mapping.
-     * 
-     * @param attributeId
-     * @param attributeValue
-     * @throws IllegalArgumentException if an attribute mapping is invalid.
-     */
-    private void validateAttribute(String attributeId, String attributeValue) {
-        if (attributeId == null) {
-            throw new IllegalArgumentException("An attribute cannot have a null ID!");
+        if (preferenceId == null) {
+            throw new IllegalArgumentException("A preference cannot have a null ID!");
         }
-        if (attributeValue == null) {
-            throw new IllegalArgumentException("An attribute cannot have a null value!");
-        }
-    }
-    
-    /**
-     * Normalizes Attribute Strings.
-     * 
-     * @param input
-     * @return
-     */
-    public static String getNormalizedAttributeString(String input) {
-        return input.trim().toLowerCase().replaceAll("\\s", " ");
     }
     
 }
