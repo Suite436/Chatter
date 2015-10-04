@@ -1,8 +1,5 @@
 package data.proxy;
 
-import java.util.Collection;
-import java.util.function.Predicate;
-
 import data.structure.UserProfile;
 
 /**
@@ -25,18 +22,10 @@ public abstract interface UserProfileStore {
     public void delete(String id);
     
     /**
-     * Gets the posts for the specified user from storage.
+     * Gets the profile for the specified user from storage.
      * 
      * @param id The String id for the UserProfile to retrieve
      * @return the user's profile, or null if the user does not exist
      */
     public UserProfile getProfile(String id);
-    
-    /**
-     * Returns a filtered collection of users who match the given condition.
-     * 
-     * @param predicate
-     * @return filtered collection of users
-     */
-    public Collection<UserProfile> getUsersForPredicate(Predicate<UserProfile> predicate);
 }

@@ -24,19 +24,23 @@ import com.amazonaws.services.dynamodbv2.model.PutItemResult;
 import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
 import com.amazonaws.services.dynamodbv2.model.TableDescription;
 
-import data.proxy.adapter.DDBUserProfileAdapter;
-import data.structure.UserProfile;
+import data.proxy.adapter.DDBPreferenceAdapter;
+import data.structure.Preference;
+import data.structure.PreferenceCategory;
 
 /**
- * Tests the functionality of the DDBUserProfileStore class.
+ * Tests the functionality of the DDBPreferenceCorrelationGraph class.
  */
-public class DDBUserProfileStoreTest {
+public class DDBPreferenceCorrelationGraphTest {
     
-    private static final String USER_TABLE_NAME = "UserProfiles";
+    private static final String PREFERENCE_TABLE_NAME = "PreferenceCorrelations";
     private static final String NONEXISTENT_TABLE_NAME = "PigsThatHaveFlown";
     private static final String INVALID_SCHEMA_TABLE_NAME = "UserPosts";
-    private static final String INVALID_SCHEMA_KEY_NAME = "PostID";
-    private static final String TEST_USER_NAME = "TestUser";
+    private static final String INVALID_SCHEMA_KEY_NAME = "PancakeID";
+    private static final String TEST_PREFERENCE_ID = "TestPreference";
+    private static final PreferenceCategory TEST_PREFERENCE_CATEGORY = PreferenceCategory.TELEVISION;
+    private static final String TEST_HASH_KEY = DDBPreferenceAdapter.buildDBStringFromComponents(
+            TEST_PREFERENCE_ID, TEST_PREFERENCE_CATEGORY);
     private DynamoDB ddbClient;
     
     /**
@@ -55,7 +59,7 @@ public class DDBUserProfileStoreTest {
         boolean thrown = false;
         
         try {
-            new DDBUserProfileStore(null, USER_TABLE_NAME);
+            new DDBPreferenceCorrelationGraph(null, PREFERENCE_TABLE_NAME);
         } catch (NullPointerException e) {
             thrown = true;
         }
@@ -74,7 +78,7 @@ public class DDBUserProfileStoreTest {
         boolean thrown = false;
         
         try {
-            new DDBUserProfileStore(ddbClient, NONEXISTENT_TABLE_NAME);
+            new DDBPreferenceCorrelationGraph(ddbClient, NONEXISTENT_TABLE_NAME);
         } catch (IllegalArgumentException e) {
             thrown = true;
         }
@@ -96,7 +100,7 @@ public class DDBUserProfileStoreTest {
         boolean thrown = false;
         
         try {
-            new DDBUserProfileStore(ddbClient, INVALID_SCHEMA_TABLE_NAME);
+            new DDBPreferenceCorrelationGraph(ddbClient, INVALID_SCHEMA_TABLE_NAME);
         } catch (IllegalArgumentException e) {
             thrown = true;
         }
@@ -109,7 +113,7 @@ public class DDBUserProfileStoreTest {
     }
     
     /**
-     * Tests that the write() method of DDBUserProfileStore calls table.putItem() once.
+     * Tests that the write() method of DDBPreferenceCorrelationGraph calls table.putItem() once.
      */
     @Test
     public void testWrite() {
@@ -119,50 +123,56 @@ public class DDBUserProfileStoreTest {
         replay(tableToTest);
         replay(ddbClient);
         
-        DDBUserProfileStore store = new DDBUserProfileStore(ddbClient, USER_TABLE_NAME);
-        store.write(new UserProfile("test"));
+        DDBPreferenceCorrelationGraph graph = new DDBPreferenceCorrelationGraph(ddbClient,
+                PREFERENCE_TABLE_NAME);
+        graph.write(new Preference(TEST_PREFERENCE_ID, TEST_PREFERENCE_CATEGORY));
         
         verify(tableToTest);
         verify(ddbClient);
     }
     
     /**
-     * Tests that the getProfile() method of DDBUserProfileStore calls table.getItem() once.
+     * Tests that the getPreference() method of DDBPreferenceCorrelationGraph calls table.getItem()
+     * once.
      */
     @Test
     public void testGet() {
         Table tableToTest = expectValidTable();
-        Item testUserItem = new Item().withPrimaryKey(DDBUserProfileAdapter.USER_ID_ATTRIBUTE,
-                TEST_USER_NAME);
-        expect(tableToTest.getItem(DDBUserProfileAdapter.USER_ID_ATTRIBUTE, TEST_USER_NAME))
+        Item testUserItem = new Item().withPrimaryKey(DDBPreferenceAdapter.PREFERENCE_ID_ATTRIBUTE,
+                TEST_HASH_KEY).withInt(DDBPreferenceAdapter.POPULARITY_ATTRIBUTE, 1);
+        expect(tableToTest.getItem(DDBPreferenceAdapter.PREFERENCE_ID_ATTRIBUTE, TEST_HASH_KEY))
                 .andReturn(testUserItem).once();
         replay(tableToTest);
         replay(ddbClient);
         
-        DDBUserProfileStore store = new DDBUserProfileStore(ddbClient, USER_TABLE_NAME);
-        UserProfile testUserProfile = store.getProfile(TEST_USER_NAME);
+        DDBPreferenceCorrelationGraph graph = new DDBPreferenceCorrelationGraph(ddbClient,
+                PREFERENCE_TABLE_NAME);
+        Preference testPreference = graph.getPreference(TEST_PREFERENCE_ID,
+                TEST_PREFERENCE_CATEGORY);
         
-        assertNotNull("The getProfile() method did not return a profile!", testUserProfile);
-        assertEquals("The returned profile did not have the correct ID!", TEST_USER_NAME,
-                testUserProfile.getId());
+        assertNotNull("The getPreference() method did not return a preference!", testPreference);
+        assertEquals("The returned profile did not have the correct ID!", TEST_PREFERENCE_ID,
+                testPreference.getID());
         
         verify(tableToTest);
         verify(ddbClient);
     }
     
     /**
-     * Tests that the delete() method of DDBUserProfileStore calls table.deleteItem() once.
+     * Tests that the delete() method of DDBPreferenceCorrelationGraph calls table.deleteItem()
+     * once.
      */
     @Test
     public void testDelete() {
         Table tableToTest = expectValidTable();
-        expect(tableToTest.deleteItem(DDBUserProfileAdapter.USER_ID_ATTRIBUTE, TEST_USER_NAME))
+        expect(tableToTest.deleteItem(DDBPreferenceAdapter.PREFERENCE_ID_ATTRIBUTE, TEST_HASH_KEY))
                 .andReturn(new DeleteItemOutcome(new DeleteItemResult())).once();
         replay(tableToTest);
         replay(ddbClient);
         
-        DDBUserProfileStore store = new DDBUserProfileStore(ddbClient, USER_TABLE_NAME);
-        store.delete(TEST_USER_NAME);
+        DDBPreferenceCorrelationGraph graph = new DDBPreferenceCorrelationGraph(ddbClient,
+                PREFERENCE_TABLE_NAME);
+        graph.delete(TEST_PREFERENCE_ID, TEST_PREFERENCE_CATEGORY);
         
         verify(tableToTest);
         verify(ddbClient);
@@ -174,15 +184,15 @@ public class DDBUserProfileStoreTest {
      * @return
      */
     private Table expectValidTable() {
-        KeySchemaElement keySchema = new KeySchemaElement(DDBUserProfileAdapter.USER_ID_ATTRIBUTE,
-                KeyType.HASH);
-        TableDescription tableDesc = new TableDescription().withTableName(USER_TABLE_NAME)
+        KeySchemaElement keySchema = new KeySchemaElement(
+                DDBPreferenceAdapter.PREFERENCE_ID_ATTRIBUTE, KeyType.HASH);
+        TableDescription tableDesc = new TableDescription().withTableName(PREFERENCE_TABLE_NAME)
                 .withKeySchema(keySchema);
         
         Table userTable = createMock(Table.class);
         expect(userTable.describe()).andReturn(tableDesc).atLeastOnce();
         
-        expect(ddbClient.getTable(USER_TABLE_NAME)).andReturn(userTable).atLeastOnce();
+        expect(ddbClient.getTable(PREFERENCE_TABLE_NAME)).andReturn(userTable).atLeastOnce();
         
         return userTable;
     }

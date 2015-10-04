@@ -1,4 +1,4 @@
-package data.proxy.adapter;
+package data.structure;
 
 /**
  * PreferenceCategory outlines all possible categories for a user preference.

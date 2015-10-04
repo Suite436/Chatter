@@ -2,16 +2,10 @@ package data.proxy;
 
 import static data.proxy.adapter.DDBUserProfileAdapter.USER_ID_ATTRIBUTE;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
-import java.util.function.Predicate;
 
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Item;
-import com.amazonaws.services.dynamodbv2.document.ItemCollection;
-import com.amazonaws.services.dynamodbv2.document.ScanOutcome;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import com.amazonaws.services.dynamodbv2.model.KeySchemaElement;
 import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
@@ -86,24 +80,5 @@ public class DDBUserProfileStore implements UserProfileStore {
         } else {
             return new DDBUserProfileAdapter().withDBModel(item).toObject();
         }
-    }
-    
-    /**
-     * {@inheritDoc}
-     */
-    public Collection<UserProfile> getUsersForPredicate(Predicate<UserProfile> predicate) {
-        // TODO Pending design and implementation of Attribute-Linked User Graph, because scanning
-        // the entire table is horribly unscalable.
-        Collection<UserProfile> resultSet = new ArrayList<UserProfile>();
-        ItemCollection<ScanOutcome> outcomes = this.userTable.scan();
-        Iterator<Item> items = outcomes.iterator();
-        while (items.hasNext()) {
-            Item item = items.next();
-            UserProfile user = new DDBUserProfileAdapter().withDBModel(item).toObject();
-            if (predicate.test(user)) {
-                resultSet.add(user);
-            }
-        }
-        return resultSet;
     }
 }

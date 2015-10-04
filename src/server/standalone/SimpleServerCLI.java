@@ -4,7 +4,7 @@ import java.util.Scanner;
 
 import data.proxy.LocalTransientUserProfileStore;
 import data.proxy.UserProfileStore;
-import data.proxy.adapter.PreferenceCategory;
+import data.structure.PreferenceCategory;
 import data.structure.UserProfile;
 
 /**
