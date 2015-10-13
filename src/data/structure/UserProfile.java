@@ -7,8 +7,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import data.proxy.adapter.PreferenceCategory;
-
 /**
  * UserProfile represents a user, containing all user metadata.
  */
@@ -67,6 +65,20 @@ public class UserProfile {
     }
     
     /**
+     * Adds all supplied preferences for the user.
+     * 
+     * @param preferences
+     */
+    public void addAllPreferences(Map<PreferenceCategory, Set<String>> preferences) {
+        for (Entry<PreferenceCategory, Set<String>> preferenceCategory : preferences.entrySet()) {
+            PreferenceCategory category = preferenceCategory.getKey();
+            for (String preference : preferenceCategory.getValue()) {
+                addPreference(category, preference);
+            }
+        }
+    }
+    
+    /**
      * Removes the specified preference.
      * 
      * @param category
@@ -78,20 +90,6 @@ public class UserProfile {
             Set<String> preferences = this.preferences.get(category);
             if (preferences != null) {
                 preferences.remove(preferenceId);
-            }
-        }
-    }
-    
-    /**
-     * Adds all supplied preferences for the user.
-     * 
-     * @param preferences
-     */
-    public void addAllPreferences(Map<PreferenceCategory, Set<String>> preferences) {
-        for (Entry<PreferenceCategory, Set<String>> preferenceCategory : preferences.entrySet()) {
-            PreferenceCategory category = preferenceCategory.getKey();
-            for (String preference : preferenceCategory.getValue()) {
-                addPreference(category, preference);
             }
         }
     }

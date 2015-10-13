@@ -7,6 +7,7 @@ import java.util.Set;
 
 import com.amazonaws.services.dynamodbv2.document.Item;
 
+import data.structure.PreferenceCategory;
 import data.structure.UserProfile;
 
 /**
@@ -14,7 +15,7 @@ import data.structure.UserProfile;
  * corresponding DynamoDB Item.
  */
 public class DDBUserProfileAdapter {
-    public static final String USER_ID_ATTRIBUTE = "ID";
+    public static final String USER_ID_ATTRIBUTE = "UserID";
     public static final String PREFERENCE_MAP_ATTRIBUTE = "Preferences";
     
     private UserProfile userProfile;
@@ -108,8 +109,8 @@ public class DDBUserProfileAdapter {
             dbPreferences.put(preferenceCategory.getKey().name(), preferenceCategory.getValue());
         }
         
-        this.dbModel = new Item().withPrimaryKey(USER_ID_ATTRIBUTE, this.userProfile.getId()).with(
-                PREFERENCE_MAP_ATTRIBUTE, dbPreferences);
+        this.dbModel = new Item().withPrimaryKey(USER_ID_ATTRIBUTE, this.userProfile.getId())
+                .withMap(PREFERENCE_MAP_ATTRIBUTE, dbPreferences);
         
         return this.dbModel;
     }

@@ -7,11 +7,11 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import org.junit.Test;
-
-import data.proxy.adapter.PreferenceCategory;
 
 /**
  * Tests the functionality of the UserProfile class.
@@ -19,10 +19,10 @@ import data.proxy.adapter.PreferenceCategory;
 public class UserProfileTest {
     
     /**
-     * Tests the argument requirements for the UserProfile constructors.
+     * Tests that the constructor fails when a null id is provided.
      */
     @Test
-    public void testConstructorRequirements() {
+    public void testConstructorNullId() {
         boolean thrown = false;
         
         try {
@@ -32,26 +32,46 @@ public class UserProfileTest {
         }
         
         assertTrue("A null id was passed in, but no IllegalArgumentException was thrown!", thrown);
+    }
+    
+    /**
+     * Tests that the constructor fails when a null preference set is provided.
+     */
+    @Test
+    public void testConstructorNullPreferenceSet() {
+        boolean thrown = false;
         
-        thrown = false;
+        Map<PreferenceCategory, Set<String>> preferences = new HashMap<PreferenceCategory, Set<String>>();
+        preferences.put(PreferenceCategory.MOVIES, new HashSet<String>());
+        preferences.put(PreferenceCategory.BOOKS, null);
         
         try {
-            new UserProfile("123abc", null);
-        } catch (IllegalArgumentException e) {
+            new UserProfile("123", preferences);
+        } catch (IllegalArgumentException | NullPointerException e) {
             thrown = true;
         }
         
-        assertFalse("A valid id was passed in, but an IllegalArgumentException was thrown!", thrown);
+        assertTrue("A null preference set was passed in, but no Exception was thrown!", thrown);
+    }
+    
+    /**
+     * Tests that the constructor fails when a null preference is provided within a preference set.
+     */
+    @Test
+    public void testConstructorNullPreference() {
+        boolean thrown = false;
         
-        thrown = false;
+        Map<PreferenceCategory, Set<String>> preferences = new HashMap<PreferenceCategory, Set<String>>();
+        preferences.put(PreferenceCategory.MOVIES, new HashSet<String>());
+        preferences.get(PreferenceCategory.MOVIES).add(null);
         
         try {
-            new UserProfile("123abc", new HashMap<PreferenceCategory, Set<String>>());
-        } catch (Exception e) {
+            new UserProfile("123", preferences);
+        } catch (IllegalArgumentException | NullPointerException e) {
             thrown = true;
         }
         
-        assertFalse("Valid arguments were passed in, but an Exception was thrown!", thrown);
+        assertTrue("A null preference was passed in, but no Exception was thrown!", thrown);
     }
     
     /**
@@ -162,7 +182,7 @@ public class UserProfileTest {
         UserProfile user2 = new UserProfile("Seth");
         
         // First, validate assumption that these users are actually equivalent.
-        assertEquals("Two identical Posts are not considered equivalent!", user1, user2);
+        assertEquals("Two identical UserProfiles are not considered equivalent!", user1, user2);
         
         assertEquals("The two objects are equivalent, but hashCode() returned different integers!",
                 user1.hashCode(), user2.hashCode());
