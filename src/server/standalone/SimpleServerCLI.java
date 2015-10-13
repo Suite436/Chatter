@@ -1,16 +1,10 @@
 package server.standalone;
 
-import java.util.List;
 import java.util.Scanner;
-import java.util.function.Predicate;
 
-import server.feed.FeedBuilder;
-import server.matching.PercentMatchUserMatcher;
-import server.matching.UserMatcher;
 import data.proxy.LocalTransientUserProfileStore;
-import data.proxy.PostStore;
 import data.proxy.UserProfileStore;
-import data.structure.Post;
+import data.proxy.adapter.PreferenceCategory;
 import data.structure.UserProfile;
 
 /**
@@ -22,10 +16,8 @@ public class SimpleServerCLI {
      * The set of allowed commands for this simple CLI.
      */
     enum COMMAND {
-        LOGIN, SET, POST, FEED
+        LOGIN, ADD, REMOVE
     };
-    
-    private static final double DEFAULT_PERCENT_MATCH = 0.5;
     
     private static final Scanner in = new Scanner(System.in);
     private static UserProfile currentUser;
@@ -39,15 +31,6 @@ public class SimpleServerCLI {
         // final UserProfileStore userStore = new DDBUserProfileStore(new DynamoDB(
         // new AmazonDynamoDBClient()), "UserProfiles");
         final UserProfileStore userStore = new LocalTransientUserProfileStore();
-        final PostStore postStore = new PostStore();
-        final UserMatcher userMatcher = new PercentMatchUserMatcher(DEFAULT_PERCENT_MATCH);
-        final Predicate<Post> postPredicate = new Predicate<Post>() {
-            public boolean test(Post post) {
-                return true;
-            }
-        };
-        final FeedBuilder feedBuilder = new FeedBuilder(postStore, userStore, userMatcher,
-                postPredicate);
         
         printGreeting();
         
@@ -72,14 +55,11 @@ public class SimpleServerCLI {
             case LOGIN:
                 login(userStore, line);
                 break;
-            case SET:
-                setAttribute(userStore, line);
+            case ADD:
+                addPreference(userStore, line);
                 break;
-            case POST:
-                post(postStore, line);
-                break;
-            case FEED:
-                getFeed(feedBuilder);
+            case REMOVE:
+                removePreference(userStore, line);
                 break;
             default:
             }
@@ -123,62 +103,46 @@ public class SimpleServerCLI {
         System.out.println(String.format("Logged in as %s.", userId));
     }
     
-    private static final int ATTRIBUTE_NAME_INDEX = 1;
-    private static final int ATTRIBUTE_VALUE_INDEX = 2;
+    private static final int PREFERENCE_CATEGORY_INDEX = 1;
+    private static final int PREFERENCE_ID_INDEX = 2;
     
     /**
-     * Set an attribute for the current user.
+     * Adds a preference for the current user.
      * 
      * @param userStore
      * @param line
      */
-    private static void setAttribute(UserProfileStore userStore, String[] line) {
+    private static void addPreference(UserProfileStore userStore, String[] line) {
         if (isLoggedIn()) {
-            String attributeName = line[ATTRIBUTE_NAME_INDEX];
-            String attributeValue = line[ATTRIBUTE_VALUE_INDEX];
+            String categoryString = line[PREFERENCE_CATEGORY_INDEX].toUpperCase();
+            PreferenceCategory category = PreferenceCategory.valueOf(categoryString);
+            String preferenceId = line[PREFERENCE_ID_INDEX];
             
-            currentUser.setAttribute(attributeName, attributeValue);
+            currentUser.addPreference(category, preferenceId);
             userStore.write(currentUser);
             
-            System.out.println(String.format("Set attribute \"%s\" to \"%s\".", attributeName,
-                    attributeValue));
+            System.out.println(String.format("Added preference %s: %s.", categoryString,
+                    preferenceId));
         }
     }
     
-    private static final int POST_CONTENT_INDEX = 1;
-    
     /**
-     * Create a post for the current user.
+     * Removes a preference for the current user.
      * 
-     * @param postStore
+     * @param userStore
      * @param line
      */
-    private static void post(PostStore postStore, String[] line) {
+    private static void removePreference(UserProfileStore userStore, String[] line) {
         if (isLoggedIn()) {
-            String postContent = line[POST_CONTENT_INDEX];
-            Post post = new Post(currentUser.getId(), postContent);
+            String categoryString = line[PREFERENCE_CATEGORY_INDEX].toUpperCase();
+            PreferenceCategory category = PreferenceCategory.valueOf(categoryString);
+            String preferenceId = line[PREFERENCE_ID_INDEX];
             
-            postStore.write(post);
+            currentUser.removePreference(category, preferenceId);
+            userStore.write(currentUser);
             
-            System.out.println(String.format("Created post \"%s\".", postContent));
-        }
-    }
-    
-    /**
-     * Prints the feed for the current user.
-     * 
-     * @param feedBuilder
-     */
-    private static void getFeed(FeedBuilder feedBuilder) {
-        if (isLoggedIn()) {
-            List<Post> feed = feedBuilder.getFeedForUser(currentUser);
-            
-            System.out.println(String.format("Feed for user %s:", currentUser.getId()));
-            
-            for (Post post : feed) {
-                System.out.println(String.format("\r\n\t%s >> %s", post.getUser(),
-                        post.getContent()));
-            }
+            System.out.println(String.format("Removed preference %s: %s.", categoryString,
+                    preferenceId));
         }
     }
     

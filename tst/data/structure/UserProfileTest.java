@@ -7,9 +7,11 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.HashMap;
-import java.util.Map;
+import java.util.Set;
 
 import org.junit.Test;
+
+import data.proxy.adapter.PreferenceCategory;
 
 /**
  * Tests the functionality of the UserProfile class.
@@ -34,20 +36,6 @@ public class UserProfileTest {
         thrown = false;
         
         try {
-            Map<String, String> attributes = new HashMap<String, String>();
-            attributes.put("attribute1", null);
-            new UserProfile("123abc", attributes);
-        } catch (IllegalArgumentException e) {
-            thrown = true;
-        }
-        
-        assertTrue(
-                "A null attribute value was passed in, but no IllegalArgumentException was thrown!",
-                thrown);
-        
-        thrown = false;
-        
-        try {
             new UserProfile("123abc", null);
         } catch (IllegalArgumentException e) {
             thrown = true;
@@ -58,7 +46,7 @@ public class UserProfileTest {
         thrown = false;
         
         try {
-            new UserProfile("123abc", new HashMap<String, String>());
+            new UserProfile("123abc", new HashMap<PreferenceCategory, Set<String>>());
         } catch (Exception e) {
             thrown = true;
         }
@@ -67,71 +55,50 @@ public class UserProfileTest {
     }
     
     /**
-     * Tests that the getAttribute() method returns the correct attribute when found.
+     * Tests that the getPreferencesForCategory() method returns the correct preferences.
      */
     @Test
-    public void testGetAttributeFound() {
-        String attributeId = "location";
-        String attributeValue = "New York, NY";
+    public void testGetPreferencesForCategory() {
+        PreferenceCategory category = PreferenceCategory.BOOKS;
+        String preferenceId = "Hidden Empire";
         String id = "123";
         
         UserProfile profile = new UserProfile(id);
         
-        profile.setAttribute(attributeId, attributeValue);
+        profile.addPreference(category, preferenceId);
         
-        assertEquals("The returned attribute value was incorrect!",
-                UserProfile.getNormalizedAttributeString(attributeValue),
-                profile.getAttribute(attributeId));
+        assertTrue("The profile did not correctly return the preference!", profile
+                .getPreferencesForCategory(category).contains(preferenceId));
+        
+        assertEquals("The profile did not return the correct number of preferences!", 1, profile
+                .getPreferencesForCategory(category).size());
     }
     
     /**
-     * Tests that the getAttribute() method returns null when not found.
+     * Tests that the getPreferencesForCategory() method returns null when not found.
      */
     @Test
-    public void testGetAttributeNotFound() {
-        String attributeId = "location";
-        String attributeValue = "New York, NY";
+    public void testGetPreferencesForCategoryNotFound() {
+        PreferenceCategory category = PreferenceCategory.BOOKS;
+        String preferenceId = "Hidden Empire";
         String id = "123";
         
         UserProfile profile = new UserProfile(id);
         
-        profile.setAttribute(attributeId, attributeValue);
+        profile.addPreference(category, preferenceId);
         
-        String missingAttribute = "missingAttribute";
+        PreferenceCategory missingCategory = PreferenceCategory.MOVIES;
         
-        assertNull("The profile returned a non-null value for a missing attribute!",
-                profile.getAttribute(missingAttribute));
+        assertNull("The profile returned a non-null value for a missing category!",
+                profile.getPreferencesForCategory(missingCategory));
     }
     
     /**
-     * Tests that a null attribute ID is not accepted.
+     * Tests that a null preference ID is not accepted.
      */
     @Test
-    public void testSetAttributeNullId() {
-        String attributeValue = "New York, NY";
-        String id = "123";
-        
-        UserProfile profile = new UserProfile(id);
-        
-        boolean thrown = false;
-        
-        try {
-            profile.setAttribute(null, attributeValue);
-        } catch (IllegalArgumentException e) {
-            thrown = true;
-        }
-        
-        assertTrue(
-                "A null attribute ID was passed in, but no IllegalArgumentException was thrown!",
-                thrown);
-    }
-    
-    /**
-     * Tests that a null attribute value is not accepted.
-     */
-    @Test
-    public void testSetAttributeNullValue() {
-        String attributeId = "location";
+    public void testAddPreferenceNullID() {
+        PreferenceCategory category = PreferenceCategory.BOOKS;
         String id = "123";
         
         UserProfile profile = new UserProfile(id);
@@ -139,53 +106,14 @@ public class UserProfileTest {
         boolean thrown = false;
         
         try {
-            profile.setAttribute(attributeId, null);
+            profile.addPreference(category, null);
         } catch (IllegalArgumentException e) {
             thrown = true;
         }
         
         assertTrue(
-                "A null attribute value was passed in, but no IllegalArgumentException was thrown!",
+                "A null preference ID was passed in, but no IllegalArgumentException was thrown!",
                 thrown);
-    }
-    
-    /**
-     * Tests that the "attribute intersection" between two users is calculated correctly.
-     */
-    @Test
-    public void testGetAttributeIntersection() {
-        UserProfile user1 = new UserProfile("Seth");
-        UserProfile user2 = new UserProfile("Charles");
-        
-        String[] commonAttrib1 = { UserProfile.getNormalizedAttributeString("profession"),
-                UserProfile.getNormalizedAttributeString("Software Developer") };
-        String[] commonAttrib2 = { UserProfile.getNormalizedAttributeString("hobby"),
-                UserProfile.getNormalizedAttributeString("Reading") };
-        String[] uniqueAttrib1 = { UserProfile.getNormalizedAttributeString("location"),
-                UserProfile.getNormalizedAttributeString("New York, NY") };
-        String[] uniqueAttrib2 = { UserProfile.getNormalizedAttributeString("location"),
-                UserProfile.getNormalizedAttributeString("Tuscaloosa, AL") };
-        
-        // Set common attributes
-        user1.setAttribute(commonAttrib1[0], commonAttrib1[1]);
-        user2.setAttribute(commonAttrib1[0], commonAttrib1[1]);
-        user1.setAttribute(commonAttrib2[0], commonAttrib2[1]);
-        user2.setAttribute(commonAttrib2[0], commonAttrib2[1]);
-        
-        // Set unique attributes
-        user1.setAttribute(uniqueAttrib1[0], uniqueAttrib1[1]);
-        user2.setAttribute(uniqueAttrib2[0], uniqueAttrib2[1]);
-        
-        // Build expected intersection
-        Map<String, String> intersection = new HashMap<String, String>();
-        intersection.put(commonAttrib1[0], commonAttrib1[1]);
-        intersection.put(commonAttrib2[0], commonAttrib2[1]);
-        
-        // Test symmetry of operation
-        assertEquals("The intersection was not calculated correctly!", intersection,
-                user1.getAttributeIntersection(user2));
-        assertEquals("The intersection was not calculated correctly!", intersection,
-                user2.getAttributeIntersection(user1));
     }
     
     /**
