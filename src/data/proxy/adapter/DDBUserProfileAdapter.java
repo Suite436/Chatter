@@ -4,9 +4,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.amazonaws.services.dynamodbv2.document.Item;
 
+import data.structure.Preference;
 import data.structure.PreferenceCategory;
 import data.structure.UserProfile;
 
@@ -103,10 +105,16 @@ public class DDBUserProfileAdapter {
                     "You cannot create the DBModel without first providing a UserProfile object!");
         }
         
+        // We need a composite structure of basic types for the DDB Item.
         Map<String, Set<String>> dbPreferences = new HashMap<String, Set<String>>();
-        for (Entry<PreferenceCategory, Set<String>> preferenceCategory : this.userProfile
+        for (Entry<PreferenceCategory, Set<Preference>> preferenceCategory : this.userProfile
                 .getPreferences().entrySet()) {
-            dbPreferences.put(preferenceCategory.getKey().name(), preferenceCategory.getValue());
+            // Collect preference IDs into Set of Strings.
+            Set<String> preferenceIds = preferenceCategory.getValue().stream()
+                    .map((Preference p) -> p.getID()).collect(Collectors.toSet());
+            
+            // Add set to item attribute map.
+            dbPreferences.put(preferenceCategory.getKey().name(), preferenceIds);
         }
         
         this.dbModel = new Item().withPrimaryKey(USER_ID_ATTRIBUTE, this.userProfile.getId())

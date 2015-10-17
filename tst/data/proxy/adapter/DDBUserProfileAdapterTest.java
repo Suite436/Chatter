@@ -14,6 +14,7 @@ import org.junit.Test;
 
 import com.amazonaws.services.dynamodbv2.document.Item;
 
+import data.structure.Preference;
 import data.structure.PreferenceCategory;
 import data.structure.UserProfile;
 
@@ -24,7 +25,7 @@ public class DDBUserProfileAdapterTest {
     
     private static final String TEST_USER_ID = "TestUser";
     private static final PreferenceCategory PREFERENCE_CATEGORY_TO_USE = PreferenceCategory.BOOKS;
-    private static final String PREFERENCE_ID = "Lord of the Rings";
+    private static final String PREFERENCE_ID = "LordOfTheRings";
     
     private UserProfile testProfile;
     private Item testModel;
@@ -39,9 +40,10 @@ public class DDBUserProfileAdapterTest {
         dbPreferences.put(PREFERENCE_CATEGORY_TO_USE.name(), new HashSet<String>());
         dbPreferences.get(PREFERENCE_CATEGORY_TO_USE.name()).add(PREFERENCE_ID);
         
-        Map<PreferenceCategory, Set<String>> preferences = new HashMap<PreferenceCategory, Set<String>>();
-        preferences.put(PREFERENCE_CATEGORY_TO_USE, new HashSet<String>());
-        preferences.get(PREFERENCE_CATEGORY_TO_USE).add(PREFERENCE_ID);
+        Map<PreferenceCategory, Set<Preference>> preferences = new HashMap<PreferenceCategory, Set<Preference>>();
+        preferences.put(PREFERENCE_CATEGORY_TO_USE, new HashSet<Preference>());
+        preferences.get(PREFERENCE_CATEGORY_TO_USE).add(
+                new Preference(PREFERENCE_ID, PREFERENCE_CATEGORY_TO_USE));
         
         testProfile = new UserProfile(TEST_USER_ID, preferences);
         testModel = new Item()

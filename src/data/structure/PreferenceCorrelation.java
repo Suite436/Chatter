@@ -6,55 +6,48 @@ import java.util.Collection;
  * PreferenceCorrelation represents a directed correlation edge with a Preference.
  */
 public class PreferenceCorrelation {
-    private final String toPreferenceID;
+    private final Preference toPreference;
     private int weight;
     
     /**
-     * Constructor requires the preference ID of the destination, but not weight.
+     * Constructor requires the preference of the destination, but not weight.
      * 
-     * @param toPreferenceID
-     * @throws IllegalArgumentException if toPreferenceID is null;
+     * @param toPreference
+     * @throws IllegalArgumentException if toPreference is null;
      */
-    public PreferenceCorrelation(String toPreferenceID) {
-        this(toPreferenceID, 0);
+    public PreferenceCorrelation(Preference toPreference) {
+        this(toPreference, 1);
     }
     
     /**
-     * Constructor requires the preference ID of the destination and can take weight.
+     * Constructor requires the preference of the destination and can take weight.
      * 
-     * @param toPreferenceID
+     * @param toPreference
      * @param weight
      * @throws IllegalArgumentException if toPreferenceID is null;
      */
-    public PreferenceCorrelation(String toPreferenceID, int weight) {
-        if (toPreferenceID == null) {
-            throw new IllegalArgumentException("Destination preference ID cannot be null!");
+    public PreferenceCorrelation(Preference toPreference, int weight) {
+        if (toPreference == null) {
+            throw new IllegalArgumentException("Destination preference cannot be null!");
         }
-        this.toPreferenceID = toPreferenceID;
+        this.toPreference = toPreference;
         this.weight = weight;
     }
     
     /**
-     * Getter for the destination preference ID
+     * Getter for the destination preference.
      * 
-     * @return toPreferenceID
+     * @return toPreference
      */
-    public String getToPreferenceID() {
-        return this.toPreferenceID;
+    public Preference getToPreference() {
+        return this.toPreference;
     }
     
     /**
-     * Marginally increases the weight of this edge.
+     * Sets the weight of this edge.
      */
-    public void inc() {
-        this.weight++;
-    }
-    
-    /**
-     * Marginally decreases the weight of this edge.
-     */
-    public void dec() {
-        this.weight--;
+    public void setWeight(int weight) {
+        this.weight = weight;
     }
     
     /**
@@ -83,7 +76,7 @@ public class PreferenceCorrelation {
      * @throws IllegalArgumentException if the destination preferences do not match
      */
     public PreferenceCorrelation merge(PreferenceCorrelation other) {
-        if (!getToPreferenceID().equals(other.getToPreferenceID())) {
+        if (!getToPreference().equals(other.getToPreference())) {
             throw new IllegalArgumentException(
                     "You can only merge PreferenceCorrelations that point to the same preference!");
         }
@@ -94,10 +87,10 @@ public class PreferenceCorrelation {
     }
     
     /**
-     * Merges two PreferenceCorrelation objects together, combining their weights.
+     * Merges many PreferenceCorrelation objects together, combining their weights.
      * 
-     * @param other
-     * @throws IllegalArgumentException if the destination preferences do not match
+     * @param others
+     * @throws IllegalArgumentException if any of the destination preferences do not match
      */
     public PreferenceCorrelation mergeAll(Collection<PreferenceCorrelation> others) {
         return others.stream().reduce(this, (a, b) -> a.merge(b));
@@ -115,16 +108,25 @@ public class PreferenceCorrelation {
             return false;
         }
         PreferenceCorrelation correlation = (PreferenceCorrelation) obj;
-        return this.toPreferenceID.equals(correlation.getToPreferenceID());
+        return this.toPreference.equals(correlation.getToPreference());
     }
     
     /**
-     * Override of Object.hashCode(), based on destination preference ID.
+     * Override of Object.hashCode(), based on destination preference.
      * 
      * @return hashCode for correlation
      */
     @Override
     public int hashCode() {
-        return this.toPreferenceID.hashCode();
+        return this.toPreference.hashCode();
+    }
+    
+    /**
+     * Override of Object.toString().
+     */
+    @Override
+    public String toString() {
+        return String.format("To: {Category: %s  ID: %s} Weight: %d", this.toPreference
+                .getCategory().name(), this.toPreference.getID(), this.weight);
     }
 }

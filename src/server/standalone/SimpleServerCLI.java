@@ -2,8 +2,12 @@ package server.standalone;
 
 import java.util.Scanner;
 
+import server.daemons.UpdatePreferenceDaemon;
+import data.proxy.LocalTransientPreferenceCorrelationGraph;
 import data.proxy.LocalTransientUserProfileStore;
+import data.proxy.PreferenceCorrelationGraph;
 import data.proxy.UserProfileStore;
+import data.structure.Preference;
 import data.structure.PreferenceCategory;
 import data.structure.UserProfile;
 
@@ -31,6 +35,10 @@ public class SimpleServerCLI {
         // final UserProfileStore userStore = new DDBUserProfileStore(new DynamoDB(
         // new AmazonDynamoDBClient()), "UserProfiles");
         final UserProfileStore userStore = new LocalTransientUserProfileStore();
+        // final PreferenceCorrelationGraph preferenceGraph = new DDBPreferenceCorrelationGraph(
+        // new DynamoDB(new AmazonDynamoDBClient()), "PreferenceCorrelations");
+        final PreferenceCorrelationGraph preferenceGraph = new LocalTransientPreferenceCorrelationGraph();
+        final UpdatePreferenceDaemon updater = new UpdatePreferenceDaemon(preferenceGraph);
         
         printGreeting();
         
@@ -56,10 +64,10 @@ public class SimpleServerCLI {
                 login(userStore, line);
                 break;
             case ADD:
-                addPreference(userStore, line);
+                addPreference(userStore, updater, line);
                 break;
             case REMOVE:
-                removePreference(userStore, line);
+                removePreference(userStore, updater, line);
                 break;
             default:
             }
@@ -75,9 +83,7 @@ public class SimpleServerCLI {
         System.out.println("=======================================");
         System.out.println("**Available commands (Group multi-word args with double quotes):");
         System.out.println(">> login {username}");
-        System.out.println(">> set {attribute name} {attribute value}");
-        System.out.println(">> post {post content}");
-        System.out.println(">> feed");
+        System.out.println(">> add {preference category} {preference name}");
         System.out.println("=======================================\r\n");
     }
     
@@ -110,16 +116,19 @@ public class SimpleServerCLI {
      * Adds a preference for the current user.
      * 
      * @param userStore
+     * @param updater
      * @param line
      */
-    private static void addPreference(UserProfileStore userStore, String[] line) {
+    private static void addPreference(UserProfileStore userStore, UpdatePreferenceDaemon updater,
+            String[] line) {
         if (isLoggedIn()) {
-            String categoryString = line[PREFERENCE_CATEGORY_INDEX].toUpperCase();
+            String categoryString = line[PREFERENCE_CATEGORY_INDEX].trim().toUpperCase();
             PreferenceCategory category = PreferenceCategory.valueOf(categoryString);
             String preferenceId = line[PREFERENCE_ID_INDEX];
             
             currentUser.addPreference(category, preferenceId);
             userStore.write(currentUser);
+            updater.propagateAddedPreference(currentUser, new Preference(preferenceId, category));
             
             System.out.println(String.format("Added preference %s: %s.", categoryString,
                     preferenceId));
@@ -130,9 +139,11 @@ public class SimpleServerCLI {
      * Removes a preference for the current user.
      * 
      * @param userStore
+     * @param updater
      * @param line
      */
-    private static void removePreference(UserProfileStore userStore, String[] line) {
+    private static void removePreference(UserProfileStore userStore,
+            UpdatePreferenceDaemon updater, String[] line) {
         if (isLoggedIn()) {
             String categoryString = line[PREFERENCE_CATEGORY_INDEX].toUpperCase();
             PreferenceCategory category = PreferenceCategory.valueOf(categoryString);
@@ -140,6 +151,7 @@ public class SimpleServerCLI {
             
             currentUser.removePreference(category, preferenceId);
             userStore.write(currentUser);
+            updater.propagateRemovedPreference(currentUser, new Preference(preferenceId, category));
             
             System.out.println(String.format("Removed preference %s: %s.", categoryString,
                     preferenceId));

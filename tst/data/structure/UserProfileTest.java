@@ -35,35 +35,15 @@ public class UserProfileTest {
     }
     
     /**
-     * Tests that the constructor fails when a null preference set is provided.
-     */
-    @Test
-    public void testConstructorNullPreferenceSet() {
-        boolean thrown = false;
-        
-        Map<PreferenceCategory, Set<String>> preferences = new HashMap<PreferenceCategory, Set<String>>();
-        preferences.put(PreferenceCategory.MOVIES, new HashSet<String>());
-        preferences.put(PreferenceCategory.BOOKS, null);
-        
-        try {
-            new UserProfile("123", preferences);
-        } catch (IllegalArgumentException | NullPointerException e) {
-            thrown = true;
-        }
-        
-        assertTrue("A null preference set was passed in, but no Exception was thrown!", thrown);
-    }
-    
-    /**
      * Tests that the constructor fails when a null preference is provided within a preference set.
      */
     @Test
     public void testConstructorNullPreference() {
         boolean thrown = false;
         
-        Map<PreferenceCategory, Set<String>> preferences = new HashMap<PreferenceCategory, Set<String>>();
-        preferences.put(PreferenceCategory.MOVIES, new HashSet<String>());
-        preferences.get(PreferenceCategory.MOVIES).add(null);
+        Map<PreferenceCategory, Set<Preference>> preferences = new HashMap<PreferenceCategory, Set<Preference>>();
+        preferences.put(PreferenceCategory.MOVIES, new HashSet<Preference>());
+        preferences.put(PreferenceCategory.BOOKS, null);
         
         try {
             new UserProfile("123", preferences);
@@ -87,8 +67,10 @@ public class UserProfileTest {
         
         profile.addPreference(category, preferenceId);
         
-        assertTrue("The profile did not correctly return the preference!", profile
-                .getPreferencesForCategory(category).contains(preferenceId));
+        assertTrue(
+                "The profile did not correctly return the preference!",
+                profile.getPreferencesForCategory(category).contains(
+                        new Preference(preferenceId, category)));
         
         assertEquals("The profile did not return the correct number of preferences!", 1, profile
                 .getPreferencesForCategory(category).size());

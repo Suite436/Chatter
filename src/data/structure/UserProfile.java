@@ -12,7 +12,7 @@ import java.util.Set;
  */
 public class UserProfile {
     private final String id;
-    private final Map<PreferenceCategory, Set<String>> preferences;
+    private final Map<PreferenceCategory, Set<Preference>> preferences;
     
     /**
      * Constructor requires id, but not preferences.
@@ -30,12 +30,12 @@ public class UserProfile {
      * @param preferences
      * @throws IllegalArgumentException if id is null
      */
-    public UserProfile(String id, Map<PreferenceCategory, Set<String>> preferences) {
+    public UserProfile(String id, Map<PreferenceCategory, Set<Preference>> preferences) {
         if (id == null) {
             throw new IllegalArgumentException("ID cannot be null!");
         }
         this.id = id;
-        this.preferences = new HashMap<PreferenceCategory, Set<String>>();
+        this.preferences = new HashMap<PreferenceCategory, Set<Preference>>();
         if (preferences != null) {
             addAllPreferences(preferences);
         }
@@ -59,9 +59,9 @@ public class UserProfile {
     public void addPreference(PreferenceCategory category, String preferenceId) {
         validatePreference(category, preferenceId);
         if (!this.preferences.containsKey(category)) {
-            this.preferences.put(category, new HashSet<String>());
+            this.preferences.put(category, new HashSet<Preference>());
         }
-        this.preferences.get(category).add(preferenceId);
+        this.preferences.get(category).add(new Preference(preferenceId, category));
     }
     
     /**
@@ -69,11 +69,11 @@ public class UserProfile {
      * 
      * @param preferences
      */
-    public void addAllPreferences(Map<PreferenceCategory, Set<String>> preferences) {
-        for (Entry<PreferenceCategory, Set<String>> preferenceCategory : preferences.entrySet()) {
+    public void addAllPreferences(Map<PreferenceCategory, Set<Preference>> preferences) {
+        for (Entry<PreferenceCategory, Set<Preference>> preferenceCategory : preferences.entrySet()) {
             PreferenceCategory category = preferenceCategory.getKey();
-            for (String preference : preferenceCategory.getValue()) {
-                addPreference(category, preference);
+            for (Preference preference : preferenceCategory.getValue()) {
+                addPreference(category, preference.getID());
             }
         }
     }
@@ -87,7 +87,7 @@ public class UserProfile {
     public void removePreference(PreferenceCategory category, String preferenceId) {
         validatePreference(category, preferenceId);
         if (this.preferences.containsKey(category)) {
-            Set<String> preferences = this.preferences.get(category);
+            Set<Preference> preferences = this.preferences.get(category);
             if (preferences != null) {
                 preferences.remove(preferenceId);
             }
@@ -100,7 +100,7 @@ public class UserProfile {
      * @param category
      * @return preferences
      */
-    public Set<String> getPreferencesForCategory(PreferenceCategory category) {
+    public Set<Preference> getPreferencesForCategory(PreferenceCategory category) {
         return this.preferences.get(category);
     }
     
@@ -109,7 +109,7 @@ public class UserProfile {
      * 
      * @return unmodifiable version of the user's preferences
      */
-    public Map<PreferenceCategory, Set<String>> getPreferences() {
+    public Map<PreferenceCategory, Set<Preference>> getPreferences() {
         return Collections.unmodifiableMap(this.preferences);
     }
     
