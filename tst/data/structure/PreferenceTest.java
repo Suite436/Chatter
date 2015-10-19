@@ -66,6 +66,22 @@ public class PreferenceTest {
     }
     
     /**
+     * Tests the adjustPopularity() method.
+     */
+    @Test
+    public void testAdjustPopularity() {
+        final int INITIAL_POP = 0;
+        final int DELTA = 1;
+        Preference preference = new Preference("123", PreferenceCategory.BOOKS, 0);
+        
+        preference.adjustPopularity(DELTA);
+        
+        assertEquals("The popularity was not correctly adjusted!", INITIAL_POP + DELTA,
+                preference.getPopularity());
+        
+    }
+    
+    /**
      * Tests the addCorrelation() method.
      */
     @Test

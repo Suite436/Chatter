@@ -46,9 +46,13 @@ public class DDBUpdatePreferenceRequestAdapter {
         UpdateItemSpec spec = createNewUpdateForPreference(preferenceToUpdate.getCategory(),
                 preferenceToUpdate.getID());
         
-        // Update popularity.
-        addAttributeUpdate(spec, DDBPreferenceAdapter.POPULARITY_ATTRIBUTE, request
-                .getPopularityUpdate().getDelta());
+        UpdateAction popularityUpdate = request.getPopularityUpdate();
+        
+        if (popularityUpdate != null) {
+            // Update popularity.
+            addAttributeUpdate(spec, DDBPreferenceAdapter.POPULARITY_ATTRIBUTE,
+                    popularityUpdate.getDelta());
+        }
         
         // Update correlation weights.
         for (Entry<PreferenceCorrelation, UpdateAction> update : this.request
@@ -63,6 +67,8 @@ public class DDBUpdatePreferenceRequestAdapter {
                     DDBPreferenceAdapter.CORRELATIONS_ATTRIBUTE, dbPreferenceId);
             addAttributeUpdate(spec, dbAttributePath, update.getValue().getDelta());
         }
+        
+        this.dbModel = spec;
         
         return this.dbModel;
     }
@@ -90,6 +96,6 @@ public class DDBUpdatePreferenceRequestAdapter {
      * @param delta
      */
     private void addAttributeUpdate(UpdateItemSpec spec, String attributePath, int delta) {
-        spec.withAttributeUpdate(new AttributeUpdate(attributePath).addNumeric(delta));
+        spec.addAttributeUpdate(new AttributeUpdate(attributePath).addNumeric(delta));
     }
 }

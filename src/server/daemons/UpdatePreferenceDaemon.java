@@ -123,9 +123,6 @@ public class UpdatePreferenceDaemon {
             PreferenceCategory category = entry.getKey();
             for (Preference preferenceToUpdate : entry.getValue()) {
                 String preferenceToUpdateId = preferenceToUpdate.getID();
-                // Create new UpdatePreferenceRequest.
-                UpdatePreferenceRequest request = new UpdatePreferenceRequest(new Preference(
-                        preferenceToUpdateId, category));
                 
                 // Adjust weights of (or add, if new) correlations.
                 // The category must match, because we currently do not correlate across
@@ -133,14 +130,18 @@ public class UpdatePreferenceDaemon {
                 // reflexive edges.
                 if (category == changedPreference.getCategory()
                         && !preferenceToUpdateId.equals(changedPreference.getID())) {
+                    // Create new UpdatePreferenceRequest.
+                    UpdatePreferenceRequest request = new UpdatePreferenceRequest(new Preference(
+                            preferenceToUpdateId, category));
+                    
                     // Create PreferenceCorrelation for update.
                     PreferenceCorrelation correlationToUpdate = new PreferenceCorrelation(
                             changedPreference);
                     request.addCorrelationUpdate(correlationToUpdate, action);
+                    
+                    // Perform update.
+                    this.graph.updatePreference(request, user, action);
                 }
-                
-                // Perform update.
-                this.graph.updatePreference(request, user, action);
             }
         }
     }

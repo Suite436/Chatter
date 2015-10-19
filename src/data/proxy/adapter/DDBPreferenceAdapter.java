@@ -24,49 +24,41 @@ public class DDBPreferenceAdapter {
     private Item dbModel;
     
     /**
-     * Sets the Preference object.
+     * Constructor that sets the Preference object.
      * 
      * @param preference
-     * @return
+     * @throws IllegalArgumentException if preference is null
      */
-    public DDBPreferenceAdapter withObject(Preference preference) {
+    public DDBPreferenceAdapter(Preference preference) {
+        if (preference == null) {
+            throw new IllegalArgumentException("Preference cannot be null!");
+        }
         this.preference = preference;
-        
-        // If the Preference object is reset, do not retain any previously-existing DynamoDB Item.
         this.dbModel = null;
-        
-        return this;
     }
     
     /**
-     * Sets the DynamoDB Item.
+     * Constructor that sets the DynamoDB Item.
      * 
-     * @param dbModel
-     * @return
+     * @param preference
+     * @throws IllegalArgumentException if dbModel is null
      */
-    public DDBPreferenceAdapter withDBModel(Item dbModel) {
-        this.dbModel = dbModel;
-        
-        // If the DynamoDB Item is reset, do not retain any previously-existing Preference object.
+    public DDBPreferenceAdapter(Item dbModel) {
+        if (dbModel == null) {
+            throw new IllegalArgumentException("Item cannot be null!");
+        }
         this.preference = null;
-        
-        return this;
+        this.dbModel = dbModel;
     }
     
     /**
      * Generates the Preference object, if the DynamoDB Item has already been provided.
      * 
-     * @return
-     * @throws IllegalStateException if the DynamoDB Item is null.
+     * @return preference
      */
     public Preference toObject() {
         if (this.preference != null) {
             return this.preference;
-        }
-        
-        if (this.dbModel == null) {
-            throw new IllegalStateException(
-                    "You cannot create a Preference object without first providing a DBModel!");
         }
         
         String dbPreferenceID = this.dbModel.getString(PREFERENCE_ID_ATTRIBUTE);
@@ -119,17 +111,11 @@ public class DDBPreferenceAdapter {
     /**
      * Generates the DynamoDB Item, if the Preference object has already been provided.
      * 
-     * @return
-     * @throws IllegalStateException if Preference object is null.
+     * @return DynamoDB Item
      */
     public Item toDBModel() {
         if (this.dbModel != null) {
             return this.dbModel;
-        }
-        
-        if (this.preference == null) {
-            throw new IllegalStateException(
-                    "You cannot create the DBModel without first providing a Preference object!");
         }
         
         Map<String, Integer> dbCorrelations = new HashMap<String, Integer>();

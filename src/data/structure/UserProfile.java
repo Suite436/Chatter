@@ -55,13 +55,16 @@ public class UserProfile {
      * 
      * @param category
      * @param preferenceId
+     * @return added preference
      */
-    public void addPreference(PreferenceCategory category, String preferenceId) {
+    public Preference addPreference(PreferenceCategory category, String preferenceId) {
         validatePreference(category, preferenceId);
         if (!this.preferences.containsKey(category)) {
             this.preferences.put(category, new HashSet<Preference>());
         }
-        this.preferences.get(category).add(new Preference(preferenceId, category));
+        Preference newPreference = new Preference(preferenceId, category);
+        this.preferences.get(category).add(newPreference);
+        return newPreference;
     }
     
     /**
@@ -69,7 +72,7 @@ public class UserProfile {
      * 
      * @param preferences
      */
-    public void addAllPreferences(Map<PreferenceCategory, Set<Preference>> preferences) {
+    private void addAllPreferences(Map<PreferenceCategory, Set<Preference>> preferences) {
         for (Entry<PreferenceCategory, Set<Preference>> preferenceCategory : preferences.entrySet()) {
             PreferenceCategory category = preferenceCategory.getKey();
             for (Preference preference : preferenceCategory.getValue()) {
@@ -83,8 +86,9 @@ public class UserProfile {
      * 
      * @param category
      * @param preferenceId
+     * @return removed preference
      */
-    public void removePreference(PreferenceCategory category, String preferenceId) {
+    public Preference removePreference(PreferenceCategory category, String preferenceId) {
         validatePreference(category, preferenceId);
         if (this.preferences.containsKey(category)) {
             Set<Preference> preferences = this.preferences.get(category);
@@ -92,6 +96,7 @@ public class UserProfile {
                 preferences.remove(preferenceId);
             }
         }
+        return new Preference(preferenceId, category);
     }
     
     /**

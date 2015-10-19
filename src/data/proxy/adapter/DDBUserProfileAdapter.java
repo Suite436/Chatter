@@ -27,30 +27,28 @@ public class DDBUserProfileAdapter {
      * Sets the UserProfile object.
      * 
      * @param userProfile
-     * @return
+     * @throws IllegalArgumentException if userProfile is null
      */
-    public DDBUserProfileAdapter withObject(UserProfile userProfile) {
+    public DDBUserProfileAdapter(UserProfile userProfile) {
+        if (userProfile == null) {
+            throw new IllegalArgumentException("User profile cannot be null!");
+        }
         this.userProfile = userProfile;
-        
-        // If the UserProfile object is reset, do not retain any previously-existing DynamoDB Item.
         this.dbModel = null;
-        
-        return this;
     }
     
     /**
      * Sets the DynamoDB Item.
      * 
      * @param dbModel
-     * @return
+     * @throws IllegalArgumentException if dbModel is null
      */
-    public DDBUserProfileAdapter withDBModel(Item dbModel) {
-        this.dbModel = dbModel;
-        
-        // If the DynamoDB Item is reset, do not retain any previously-existing UserProfile object.
+    public DDBUserProfileAdapter(Item dbModel) {
+        if (dbModel == null) {
+            throw new IllegalArgumentException("Item cannot be null!");
+        }
         this.userProfile = null;
-        
-        return this;
+        this.dbModel = dbModel;
     }
     
     /**
@@ -63,11 +61,6 @@ public class DDBUserProfileAdapter {
     public UserProfile toObject() {
         if (this.userProfile != null) {
             return this.userProfile;
-        }
-        
-        if (this.dbModel == null) {
-            throw new IllegalStateException(
-                    "You cannot create a UserProfile object without first providing a DBModel!");
         }
         
         this.userProfile = new UserProfile(this.dbModel.getString(USER_ID_ATTRIBUTE));
@@ -98,11 +91,6 @@ public class DDBUserProfileAdapter {
     public Item toDBModel() {
         if (this.dbModel != null) {
             return this.dbModel;
-        }
-        
-        if (this.userProfile == null) {
-            throw new IllegalStateException(
-                    "You cannot create the DBModel without first providing a UserProfile object!");
         }
         
         // We need a composite structure of basic types for the DDB Item.

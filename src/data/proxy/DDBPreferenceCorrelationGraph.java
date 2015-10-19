@@ -63,7 +63,7 @@ public class DDBPreferenceCorrelationGraph implements PreferenceCorrelationGraph
      * {@inheritDoc}
      */
     public void putPreference(Preference preference) {
-        Item item = new DDBPreferenceAdapter().withObject(preference).toDBModel();
+        Item item = new DDBPreferenceAdapter(preference).toDBModel();
         this.preferenceTable.putItem(item);
     }
     
@@ -105,7 +105,7 @@ public class DDBPreferenceCorrelationGraph implements PreferenceCorrelationGraph
         if (item == null) {
             return null;
         } else {
-            return new DDBPreferenceAdapter().withDBModel(item).toObject();
+            return new DDBPreferenceAdapter(item).toObject();
         }
     }
 }

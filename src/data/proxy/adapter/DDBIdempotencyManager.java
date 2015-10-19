@@ -65,7 +65,7 @@ public class DDBIdempotencyManager {
         spec.withExpected(buildIdempotencyExpectation(flagVal));
         
         // Add update entry to set flag
-        spec.withAttributeUpdate(new AttributeUpdate(LAST_MODIFIED_BY_ATTRIBUTE).put(flagVal));
+        spec.addAttributeUpdate(new AttributeUpdate(LAST_MODIFIED_BY_ATTRIBUTE).put(flagVal));
         
         return spec;
     }

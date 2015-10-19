@@ -3,8 +3,12 @@ package server.standalone;
 import java.util.Scanner;
 
 import server.daemons.UpdatePreferenceDaemon;
-import data.proxy.LocalTransientPreferenceCorrelationGraph;
-import data.proxy.LocalTransientUserProfileStore;
+
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
+import com.amazonaws.services.dynamodbv2.document.DynamoDB;
+
+import data.proxy.DDBPreferenceCorrelationGraph;
+import data.proxy.DDBUserProfileStore;
 import data.proxy.PreferenceCorrelationGraph;
 import data.proxy.UserProfileStore;
 import data.structure.Preference;
@@ -32,12 +36,13 @@ public class SimpleServerCLI {
      * @param args
      */
     public static void main(String[] args) {
-        // final UserProfileStore userStore = new DDBUserProfileStore(new DynamoDB(
-        // new AmazonDynamoDBClient()), "UserProfiles");
-        final UserProfileStore userStore = new LocalTransientUserProfileStore();
-        // final PreferenceCorrelationGraph preferenceGraph = new DDBPreferenceCorrelationGraph(
-        // new DynamoDB(new AmazonDynamoDBClient()), "PreferenceCorrelations");
-        final PreferenceCorrelationGraph preferenceGraph = new LocalTransientPreferenceCorrelationGraph();
+        final UserProfileStore userStore = new DDBUserProfileStore(new DynamoDB(
+                new AmazonDynamoDBClient()), "UserProfiles");
+        // final UserProfileStore userStore = new LocalTransientUserProfileStore();
+        final PreferenceCorrelationGraph preferenceGraph = new DDBPreferenceCorrelationGraph(
+                new DynamoDB(new AmazonDynamoDBClient()), "PreferenceCorrelations");
+        // final PreferenceCorrelationGraph preferenceGraph = new
+        // LocalTransientPreferenceCorrelationGraph();
         final UpdatePreferenceDaemon updater = new UpdatePreferenceDaemon(preferenceGraph);
         
         printGreeting();
@@ -126,12 +131,14 @@ public class SimpleServerCLI {
             PreferenceCategory category = PreferenceCategory.valueOf(categoryString);
             String preferenceId = line[PREFERENCE_ID_INDEX];
             
-            currentUser.addPreference(category, preferenceId);
-            userStore.write(currentUser);
-            updater.propagateAddedPreference(currentUser, new Preference(preferenceId, category));
-            
-            System.out.println(String.format("Added preference %s: %s.", categoryString,
-                    preferenceId));
+            Preference addedPreference = currentUser.addPreference(category, preferenceId);
+            if (addedPreference != null) {
+                userStore.write(currentUser);
+                updater.propagateAddedPreference(currentUser, addedPreference);
+                
+                System.out.println(String.format("Added preference %s: %s.", categoryString,
+                        preferenceId));
+            }
         }
     }
     
@@ -149,12 +156,14 @@ public class SimpleServerCLI {
             PreferenceCategory category = PreferenceCategory.valueOf(categoryString);
             String preferenceId = line[PREFERENCE_ID_INDEX];
             
-            currentUser.removePreference(category, preferenceId);
-            userStore.write(currentUser);
-            updater.propagateRemovedPreference(currentUser, new Preference(preferenceId, category));
-            
-            System.out.println(String.format("Removed preference %s: %s.", categoryString,
-                    preferenceId));
+            Preference removedPreference = currentUser.removePreference(category, preferenceId);
+            if (removedPreference != null) {
+                userStore.write(currentUser);
+                updater.propagateRemovedPreference(currentUser, removedPreference);
+                
+                System.out.println(String.format("Removed preference %s: %s.", categoryString,
+                        preferenceId));
+            }
         }
     }
     

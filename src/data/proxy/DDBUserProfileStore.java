@@ -58,7 +58,7 @@ public class DDBUserProfileStore implements UserProfileStore {
      * {@inheritDoc}
      */
     public void write(UserProfile profile) {
-        Item item = new DDBUserProfileAdapter().withObject(profile).toDBModel();
+        Item item = new DDBUserProfileAdapter(profile).toDBModel();
         this.userTable.putItem(item);
     }
     
@@ -78,7 +78,7 @@ public class DDBUserProfileStore implements UserProfileStore {
         if (item == null) {
             return null;
         } else {
-            return new DDBUserProfileAdapter().withDBModel(item).toObject();
+            return new DDBUserProfileAdapter(item).toObject();
         }
     }
 }

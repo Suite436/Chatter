@@ -70,40 +70,32 @@ public class DDBPreferenceAdapterTest {
      */
     @Test
     public void testMissingModel() {
-        DDBPreferenceAdapter adapter = new DDBPreferenceAdapter();
-        
         boolean thrown = false;
         
         try {
-            adapter.toObject();
-        } catch (IllegalStateException e) {
+            DDBPreferenceAdapter adapter = new DDBPreferenceAdapter((Item) null);
+        } catch (IllegalArgumentException e) {
             thrown = true;
         }
         
-        assertTrue(
-                "The adapter was asked to provide a Preference object without a DynamoDB Item, but no exception was thrown!",
-                thrown);
+        assertTrue("A null DynamoDB Item was provided, but no exception was thrown!", thrown);
     }
     
     /**
-     * Tests that the toDBModel() method cannot be called without first setting the UserProfile
+     * Tests that the toDBModel() method cannot be called without first setting the Preference
      * object.
      */
     @Test
     public void testMissingObject() {
-        DDBPreferenceAdapter adapter = new DDBPreferenceAdapter();
-        
         boolean thrown = false;
         
         try {
-            adapter.toDBModel();
-        } catch (IllegalStateException e) {
+            DDBPreferenceAdapter adapter = new DDBPreferenceAdapter((Preference) null);
+        } catch (IllegalArgumentException e) {
             thrown = true;
         }
         
-        assertTrue(
-                "The adapter was asked to provide a DynamoDB Item without a Preference object, but no exception was thrown!",
-                thrown);
+        assertTrue("A null Preference object was provided, but no exception was thrown!", thrown);
     }
     
     /**
@@ -111,7 +103,7 @@ public class DDBPreferenceAdapterTest {
      */
     @Test
     public void testToDBModel() {
-        DDBPreferenceAdapter adapter = new DDBPreferenceAdapter().withObject(testPreference);
+        DDBPreferenceAdapter adapter = new DDBPreferenceAdapter(testPreference);
         Item result = adapter.toDBModel();
         
         assertEquals("The returned Item did not have the expected ID!",
@@ -137,7 +129,7 @@ public class DDBPreferenceAdapterTest {
      */
     @Test
     public void testToObject() {
-        DDBPreferenceAdapter adapter = new DDBPreferenceAdapter().withDBModel(testModel);
+        DDBPreferenceAdapter adapter = new DDBPreferenceAdapter(testModel);
         Preference result = adapter.toObject();
         
         assertEquals("The returned Preference did not have the expected ID!",
