@@ -1,14 +1,15 @@
 package data.proxy;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
-import data.proxy.adapter.DDBPreferenceAdapter;
+import data.proxy.request.UpdatePreferenceRequest;
+import data.proxy.request.UpdatePreferenceRequest.UpdateAction;
 import data.structure.Preference;
 import data.structure.PreferenceCategory;
 import data.structure.PreferenceCorrelation;
+import data.structure.UserProfile;
 
 /**
  * LocalTransientPreferenceCorrelationGraph manages access to the stored preferences and preference
@@ -16,31 +17,13 @@ import data.structure.PreferenceCorrelation;
  */
 public class LocalTransientPreferenceCorrelationGraph implements PreferenceCorrelationGraph {
     
-    private Map<String, Preference> preferences;
+    private Map<PreferenceCategory, Map<String, Preference>> preferences;
     
     /**
      * Basic default constructor for LocalTransientPreferenceCorrelationGraph.
      */
     public LocalTransientPreferenceCorrelationGraph() {
-        preferences = new HashMap<String, Preference>();
-    }
-    
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void write(Preference preference) {
-        this.preferences.put(
-                DDBPreferenceAdapter.buildDBStringFromComponents(preference.getID(),
-                        preference.getCategory()), preference);
-    }
-    
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void delete(String id, PreferenceCategory category) {
-        this.preferences.remove(DDBPreferenceAdapter.buildDBStringFromComponents(id, category));
+        preferences = new HashMap<PreferenceCategory, Map<String, Preference>>();
     }
     
     /**
@@ -48,21 +31,101 @@ public class LocalTransientPreferenceCorrelationGraph implements PreferenceCorre
      */
     @Override
     public Preference getPreference(String id, PreferenceCategory category) {
-        return this.preferences.get(DDBPreferenceAdapter.buildDBStringFromComponents(id, category));
+        if (this.preferences.containsKey(category)) {
+            return this.preferences.get(category).get(id);
+        } else {
+            return null;
+        }
     }
     
     /**
      * {@inheritDoc}
      */
     @Override
-    public Collection<Preference> getCorrelatedPreferences(Preference preference) {
-        Collection<Preference> correlatedPreferences = new ArrayList<Preference>();
+    public void delete(String id, PreferenceCategory category) {
+        if (this.preferences.containsKey(category)) {
+            this.preferences.get(category).remove(id);
+        }
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void updatePreference(UpdatePreferenceRequest request, UserProfile user,
+            UpdateAction action) {
+        // Get preference from request.
+        Preference preferenceFromRequest = request.getPreferenceToUpdate();
+        PreferenceCategory category = preferenceFromRequest.getCategory();
         
-        for (PreferenceCorrelation correlation : preference.getCorrelations()) {
-            correlatedPreferences.add(this.preferences.get(correlation.getToPreferenceID()));
+        Preference preferenceToUpdate;
+        // Get corresponding preference from preference graph, if it exists.
+        if (this.preferences.containsKey(category)
+                && this.preferences.get(category).containsKey(preferenceFromRequest.getID())) {
+            preferenceToUpdate = this.preferences.get(category).get(preferenceFromRequest.getID());
+        } else {
+            // Create new Preference for graph.
+            preferenceToUpdate = new Preference(preferenceFromRequest.getID(), category, 0);
         }
         
-        return correlatedPreferences;
+        // Update popularity.
+        if (request.getPopularityUpdate() != null) {
+            preferenceToUpdate.adjustPopularity(request.getPopularityUpdate().getDelta());
+        }
+        
+        // Build initial Map of correlations for hash-based merge.
+        Map<PreferenceCorrelation, PreferenceCorrelation> correlationsToMerge = new HashMap<PreferenceCorrelation, PreferenceCorrelation>();
+        for (Entry<PreferenceCorrelation, UpdateAction> update : request.getCorrelationUpdates()
+                .entrySet()) {
+            PreferenceCorrelation correlationToUpdate = update.getKey();
+            correlationToUpdate.setWeight(update.getValue().getDelta());
+            correlationsToMerge.put(correlationToUpdate, correlationToUpdate);
+        }
+        
+        // Merge all correlations.
+        for (PreferenceCorrelation existingCorrelation : preferenceToUpdate.getCorrelations()) {
+            if (correlationsToMerge.containsKey(existingCorrelation)) {
+                correlationsToMerge.get(existingCorrelation).merge(existingCorrelation);
+            } else {
+                correlationsToMerge.put(existingCorrelation, existingCorrelation);
+            }
+        }
+        
+        // Overwrite preference's correlations
+        preferenceToUpdate.addAllCorrelations(correlationsToMerge.values());
+        
+        // Write preference back to Map.
+        putPreference(preferenceToUpdate);
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void putPreference(Preference preference) {
+        // Check for pre-existing category.
+        if (!this.preferences.containsKey(preference.getCategory())) {
+            this.preferences.put(preference.getCategory(), new HashMap<String, Preference>());
+        }
+        this.preferences.get(preference.getCategory()).put(preference.getID(), preference);
+    }
+    
+    /**
+     * Override of Object.toString().
+     */
+    @Override
+    public String toString() {
+        StringBuilder out = new StringBuilder();
+        
+        for (Entry<PreferenceCategory, Map<String, Preference>> catEntry : this.preferences
+                .entrySet()) {
+            for (Entry<String, Preference> prefEntry : catEntry.getValue().entrySet()) {
+                Preference preference = prefEntry.getValue();
+                out.append(String.format("%s\r\n", preference.toString()));
+            }
+        }
+        
+        return out.toString();
     }
     
 }

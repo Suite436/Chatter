@@ -39,7 +39,7 @@ public class DDBPreferenceCorrelationGraphTest {
     private static final String INVALID_SCHEMA_KEY_NAME = "PancakeID";
     private static final String TEST_PREFERENCE_ID = "TestPreference";
     private static final PreferenceCategory TEST_PREFERENCE_CATEGORY = PreferenceCategory.TELEVISION;
-    private static final String TEST_HASH_KEY = DDBPreferenceAdapter.buildDBStringFromComponents(
+    private static final String TEST_HASH_KEY = DDBPreferenceAdapter.buildDbIdFromComponents(
             TEST_PREFERENCE_ID, TEST_PREFERENCE_CATEGORY);
     private DynamoDB ddbClient;
     
@@ -125,7 +125,7 @@ public class DDBPreferenceCorrelationGraphTest {
         
         DDBPreferenceCorrelationGraph graph = new DDBPreferenceCorrelationGraph(ddbClient,
                 PREFERENCE_TABLE_NAME);
-        graph.write(new Preference(TEST_PREFERENCE_ID, TEST_PREFERENCE_CATEGORY));
+        graph.putPreference(new Preference(TEST_PREFERENCE_ID, TEST_PREFERENCE_CATEGORY));
         
         verify(tableToTest);
         verify(ddbClient);

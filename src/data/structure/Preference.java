@@ -1,8 +1,9 @@
 package data.structure;
 
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Preference represents a preference which has an id, a category, and correlations with other
@@ -11,7 +12,7 @@ import java.util.List;
 public class Preference {
     private final String id;
     private final PreferenceCategory category;
-    private final List<PreferenceCorrelation> correlations;
+    private final Set<PreferenceCorrelation> correlations;
     private int popularity;
     
     /**
@@ -45,20 +46,17 @@ public class Preference {
      * @throws IllegalArgumentException if id or category are null
      */
     public Preference(String id, PreferenceCategory category, int popularity,
-            List<PreferenceCorrelation> correlations) {
+            Set<PreferenceCorrelation> correlations) {
         if (id == null) {
             throw new IllegalArgumentException("Preference ID cannot be null!");
         }
         if (category == null) {
             throw new IllegalArgumentException("Preference Category cannot be null!");
         }
-        if (popularity < 0) {
-            throw new IllegalArgumentException("Popularity cannot be less than 0!");
-        }
-        this.id = id;
+        this.id = id.trim().replaceAll("\\s", "");
         this.category = category;
         this.popularity = popularity;
-        this.correlations = new ArrayList<PreferenceCorrelation>();
+        this.correlations = new HashSet<PreferenceCorrelation>();
         if (correlations != null) {
             addAllCorrelations(correlations);
         }
@@ -92,17 +90,12 @@ public class Preference {
     }
     
     /**
-     * Increments the popularity of this preference.
+     * Adjusts the popularity of this preference.
+     * 
+     * @param delta
      */
-    public void incPopularity() {
-        this.popularity++;
-    }
-    
-    /**
-     * Decrements the popularity of this preference.
-     */
-    public void decPopularity() {
-        this.popularity--;
+    public void adjustPopularity(int delta) {
+        this.popularity += delta;
     }
     
     /**
@@ -112,6 +105,12 @@ public class Preference {
      */
     public void addCorrelation(PreferenceCorrelation correlation) {
         validateCorrelation(correlation);
+        
+        // If we get a correlation update, we want to overwrite.
+        if (this.correlations.contains(correlation)) {
+            this.correlations.remove(correlation);
+        }
+        
         this.correlations.add(correlation);
     }
     
@@ -120,7 +119,7 @@ public class Preference {
      * 
      * @param correlations
      */
-    public void addAllCorrelations(List<PreferenceCorrelation> correlations) {
+    public void addAllCorrelations(Collection<PreferenceCorrelation> correlations) {
         for (PreferenceCorrelation correlation : correlations) {
             addCorrelation(correlation);
         }
@@ -135,8 +134,13 @@ public class Preference {
         this.correlations.remove(correlation);
     }
     
-    public List<PreferenceCorrelation> getCorrelations() {
-        return Collections.unmodifiableList(this.correlations);
+    /**
+     * Returns all correlated preferences.
+     * 
+     * @return all correlated preferences
+     */
+    public Set<PreferenceCorrelation> getCorrelations() {
+        return Collections.unmodifiableSet(this.correlations);
     }
     
     /**
@@ -148,5 +152,49 @@ public class Preference {
         if (correlation == null) {
             throw new IllegalArgumentException("Correlation cannot be null!");
         }
+    }
+    
+    /**
+     * Override of Object.equals(), based solely on the preference ID and category.
+     * 
+     * @param obj candidate for equality
+     * @return boolean for equality
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null || !(obj instanceof Preference)) {
+            return false;
+        }
+        Preference preference = (Preference) obj;
+        return getID().equals(preference.getID()) && getCategory() == preference.getCategory();
+    }
+    
+    /**
+     * Override of Object.hashCode(), based on preference ID and category.
+     * 
+     * @return hashCode for preference
+     */
+    @Override
+    public int hashCode() {
+        return (getID() + getCategory().name()).hashCode();
+    }
+    
+    /**
+     * Override of Object.toString().
+     */
+    @Override
+    public String toString() {
+        StringBuilder out = new StringBuilder();
+        
+        // Print Category and ID.
+        out.append(String.format("Category: %s  ID: %s  Popularity: %d\r\n", this.category.name(),
+                this.id, this.popularity));
+        
+        // Print correlations.
+        for (PreferenceCorrelation correlation : this.correlations) {
+            out.append(String.format("\t%s\r\n", correlation.toString()));
+        }
+        
+        return out.toString();
     }
 }

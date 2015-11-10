@@ -14,6 +14,7 @@ import org.junit.Test;
 
 import com.amazonaws.services.dynamodbv2.document.Item;
 
+import data.structure.Preference;
 import data.structure.PreferenceCategory;
 import data.structure.UserProfile;
 
@@ -24,7 +25,7 @@ public class DDBUserProfileAdapterTest {
     
     private static final String TEST_USER_ID = "TestUser";
     private static final PreferenceCategory PREFERENCE_CATEGORY_TO_USE = PreferenceCategory.BOOKS;
-    private static final String PREFERENCE_ID = "Lord of the Rings";
+    private static final String PREFERENCE_ID = "LordOfTheRings";
     
     private UserProfile testProfile;
     private Item testModel;
@@ -39,9 +40,10 @@ public class DDBUserProfileAdapterTest {
         dbPreferences.put(PREFERENCE_CATEGORY_TO_USE.name(), new HashSet<String>());
         dbPreferences.get(PREFERENCE_CATEGORY_TO_USE.name()).add(PREFERENCE_ID);
         
-        Map<PreferenceCategory, Set<String>> preferences = new HashMap<PreferenceCategory, Set<String>>();
-        preferences.put(PREFERENCE_CATEGORY_TO_USE, new HashSet<String>());
-        preferences.get(PREFERENCE_CATEGORY_TO_USE).add(PREFERENCE_ID);
+        Map<PreferenceCategory, Set<Preference>> preferences = new HashMap<PreferenceCategory, Set<Preference>>();
+        preferences.put(PREFERENCE_CATEGORY_TO_USE, new HashSet<Preference>());
+        preferences.get(PREFERENCE_CATEGORY_TO_USE).add(
+                new Preference(PREFERENCE_ID, PREFERENCE_CATEGORY_TO_USE));
         
         testProfile = new UserProfile(TEST_USER_ID, preferences);
         testModel = new Item()
@@ -54,19 +56,15 @@ public class DDBUserProfileAdapterTest {
      */
     @Test
     public void testMissingModel() {
-        DDBUserProfileAdapter adapter = new DDBUserProfileAdapter();
-        
         boolean thrown = false;
         
         try {
-            adapter.toObject();
-        } catch (IllegalStateException e) {
+            DDBUserProfileAdapter adapter = new DDBUserProfileAdapter((Item) null);
+        } catch (IllegalArgumentException e) {
             thrown = true;
         }
         
-        assertTrue(
-                "The adapter was asked to provide a UserProfile object without a DynamoDB Item, but no exception was thrown!",
-                thrown);
+        assertTrue("A null DynamoDB Item was provided, but no exception was thrown!", thrown);
     }
     
     /**
@@ -75,19 +73,15 @@ public class DDBUserProfileAdapterTest {
      */
     @Test
     public void testMissingObject() {
-        DDBUserProfileAdapter adapter = new DDBUserProfileAdapter();
-        
         boolean thrown = false;
         
         try {
-            adapter.toDBModel();
-        } catch (IllegalStateException e) {
+            DDBUserProfileAdapter adapter = new DDBUserProfileAdapter((UserProfile) null);
+        } catch (IllegalArgumentException e) {
             thrown = true;
         }
         
-        assertTrue(
-                "The adapter was asked to provide a DynamoDB Item without a UserProfile object, but no exception was thrown!",
-                thrown);
+        assertTrue("A null UserProfile object was provided, but no exception was thrown!", thrown);
     }
     
     /**
@@ -96,7 +90,7 @@ public class DDBUserProfileAdapterTest {
     @SuppressWarnings("unchecked")
     @Test
     public void testToDBModel() {
-        DDBUserProfileAdapter adapter = new DDBUserProfileAdapter().withObject(testProfile);
+        DDBUserProfileAdapter adapter = new DDBUserProfileAdapter(testProfile);
         Item result = adapter.toDBModel();
         
         assertEquals("The returned Item did not have the expected ID!",
@@ -117,7 +111,7 @@ public class DDBUserProfileAdapterTest {
      */
     @Test
     public void testToObject() {
-        DDBUserProfileAdapter adapter = new DDBUserProfileAdapter().withDBModel(testModel);
+        DDBUserProfileAdapter adapter = new DDBUserProfileAdapter(testModel);
         UserProfile result = adapter.toObject();
         
         assertEquals("The returned UserProfile did not have the expected ID!", testProfile.getId(),

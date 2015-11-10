@@ -2,30 +2,28 @@ package data.proxy;
 
 import static data.proxy.adapter.DDBPreferenceAdapter.PREFERENCE_ID_ATTRIBUTE;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 
-import com.amazonaws.services.dynamodbv2.document.BatchGetItemOutcome;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.Table;
-import com.amazonaws.services.dynamodbv2.document.TableKeysAndAttributes;
-import com.amazonaws.services.dynamodbv2.document.spec.BatchGetItemSpec;
+import com.amazonaws.services.dynamodbv2.document.spec.UpdateItemSpec;
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.amazonaws.services.dynamodbv2.model.KeySchemaElement;
-import com.amazonaws.services.dynamodbv2.model.KeysAndAttributes;
 import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
 import com.amazonaws.services.dynamodbv2.model.TableDescription;
 
+import data.proxy.adapter.DDBIdempotencyManager;
 import data.proxy.adapter.DDBPreferenceAdapter;
+import data.proxy.adapter.DDBUpdatePreferenceRequestAdapter;
+import data.proxy.request.UpdatePreferenceRequest;
+import data.proxy.request.UpdatePreferenceRequest.UpdateAction;
 import data.structure.Preference;
 import data.structure.PreferenceCategory;
-import data.structure.PreferenceCorrelation;
+import data.structure.UserProfile;
 
 public class DDBPreferenceCorrelationGraph implements PreferenceCorrelationGraph {
     
-    private final DynamoDB client;
     private final Table preferenceTable;
     
     /**
@@ -36,7 +34,6 @@ public class DDBPreferenceCorrelationGraph implements PreferenceCorrelationGraph
      */
     public DDBPreferenceCorrelationGraph(DynamoDB client, String preferenceTable) {
         try {
-            this.client = client;
             Table table = client.getTable(preferenceTable);
             validateTableDescription(table.describe());
             this.preferenceTable = table;
@@ -65,9 +62,29 @@ public class DDBPreferenceCorrelationGraph implements PreferenceCorrelationGraph
     /**
      * {@inheritDoc}
      */
-    public void write(Preference preference) {
-        Item item = new DDBPreferenceAdapter().withObject(preference).toDBModel();
+    public void putPreference(Preference preference) {
+        Item item = new DDBPreferenceAdapter(preference).toDBModel();
         this.preferenceTable.putItem(item);
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void updatePreference(UpdatePreferenceRequest request, UserProfile user,
+            UpdateAction action) {
+        UpdateItemSpec spec = new DDBUpdatePreferenceRequestAdapter(request).toDBModel();
+        
+        // Add idempotency guard.
+        spec = DDBIdempotencyManager.makeUpdateIdempotent(spec, user, action);
+        
+        // Submit update.
+        try {
+            this.preferenceTable.updateItem(spec);
+        } catch (ConditionalCheckFailedException e) {
+            // If the conditional check fails, then that simply means that we have already performed
+            // the update.
+        }
     }
     
     /**
@@ -75,7 +92,7 @@ public class DDBPreferenceCorrelationGraph implements PreferenceCorrelationGraph
      */
     public void delete(String id, PreferenceCategory category) {
         this.preferenceTable.deleteItem(PREFERENCE_ID_ATTRIBUTE,
-                DDBPreferenceAdapter.buildDBStringFromComponents(id, category));
+                DDBPreferenceAdapter.buildDbIdFromComponents(id, category));
         
     }
     
@@ -84,48 +101,11 @@ public class DDBPreferenceCorrelationGraph implements PreferenceCorrelationGraph
      */
     public Preference getPreference(String id, PreferenceCategory category) {
         Item item = this.preferenceTable.getItem(PREFERENCE_ID_ATTRIBUTE,
-                DDBPreferenceAdapter.buildDBStringFromComponents(id, category));
+                DDBPreferenceAdapter.buildDbIdFromComponents(id, category));
         if (item == null) {
             return null;
         } else {
-            return new DDBPreferenceAdapter().withDBModel(item).toObject();
+            return new DDBPreferenceAdapter(item).toObject();
         }
-    }
-    
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public Collection<Preference> getCorrelatedPreferences(Preference preference) {
-        List<String> keysToGet = new ArrayList<String>();
-        
-        for (PreferenceCorrelation correlation : preference.getCorrelations()) {
-            keysToGet.add(correlation.getToPreferenceID());
-        }
-        
-        Collection<Preference> correlatedPreferences = new ArrayList<Preference>();
-        
-        TableKeysAndAttributes keysAndAtts = new TableKeysAndAttributes(
-                this.preferenceTable.getTableName()).withHashOnlyKeys(
-                DDBPreferenceAdapter.PREFERENCE_ID_ATTRIBUTE, keysToGet);
-        BatchGetItemSpec spec = new BatchGetItemSpec().withTableKeyAndAttributes(keysAndAtts);
-        BatchGetItemOutcome outcome = this.client.batchGetItem(spec);
-        
-        Map<String, KeysAndAttributes> unprocessedKeys;
-        do {
-            for (List<Item> items : outcome.getTableItems().values()) {
-                for (Item item : items) {
-                    correlatedPreferences.add(new DDBPreferenceAdapter().withDBModel(item)
-                            .toObject());
-                }
-            }
-            
-            unprocessedKeys = outcome.getUnprocessedKeys();
-            if (unprocessedKeys != null && unprocessedKeys.size() > 0) {
-                outcome = client.batchGetItemUnprocessed(unprocessedKeys);
-            }
-        } while (unprocessedKeys != null && unprocessedKeys.size() > 0);
-        
-        return correlatedPreferences;
     }
 }

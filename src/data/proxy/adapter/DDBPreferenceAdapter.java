@@ -24,54 +24,46 @@ public class DDBPreferenceAdapter {
     private Item dbModel;
     
     /**
-     * Sets the Preference object.
+     * Constructor that sets the Preference object.
      * 
-     * @param userProfile
-     * @return
+     * @param preference
+     * @throws IllegalArgumentException if preference is null
      */
-    public DDBPreferenceAdapter withObject(Preference preference) {
+    public DDBPreferenceAdapter(Preference preference) {
+        if (preference == null) {
+            throw new IllegalArgumentException("Preference cannot be null!");
+        }
         this.preference = preference;
-        
-        // If the Preference object is reset, do not retain any previously-existing DynamoDB Item.
         this.dbModel = null;
-        
-        return this;
     }
     
     /**
-     * Sets the DynamoDB Item.
+     * Constructor that sets the DynamoDB Item.
      * 
-     * @param dbModel
-     * @return
+     * @param preference
+     * @throws IllegalArgumentException if dbModel is null
      */
-    public DDBPreferenceAdapter withDBModel(Item dbModel) {
-        this.dbModel = dbModel;
-        
-        // If the DynamoDB Item is reset, do not retain any previously-existing Preference object.
+    public DDBPreferenceAdapter(Item dbModel) {
+        if (dbModel == null) {
+            throw new IllegalArgumentException("Item cannot be null!");
+        }
         this.preference = null;
-        
-        return this;
+        this.dbModel = dbModel;
     }
     
     /**
      * Generates the Preference object, if the DynamoDB Item has already been provided.
      * 
-     * @return
-     * @throws IllegalStateException if the DynamoDB Item is null.
+     * @return preference
      */
     public Preference toObject() {
         if (this.preference != null) {
             return this.preference;
         }
         
-        if (this.dbModel == null) {
-            throw new IllegalStateException(
-                    "You cannot create a Preference object without first providing a DBModel!");
-        }
-        
         String dbPreferenceID = this.dbModel.getString(PREFERENCE_ID_ATTRIBUTE);
-        String preferenceID = parsePreferenceIDFromDBString(dbPreferenceID);
-        PreferenceCategory category = parseCategoryFromDBString(dbPreferenceID);
+        String preferenceID = parsePreferenceIdFromDbString(dbPreferenceID);
+        PreferenceCategory category = parseCategoryFromDbString(dbPreferenceID);
         
         int popularity = this.dbModel.getInt(POPULARITY_ATTRIBUTE);
         
@@ -81,9 +73,12 @@ public class DDBPreferenceAdapter {
         
         if (dbCorrelations != null) {
             for (Entry<String, Integer> correlation : dbCorrelations.entrySet()) {
-                String toPreferenceID = correlation.getKey();
+                String toPreferenceDbID = correlation.getKey();
+                Preference toPreference = new Preference(
+                        parsePreferenceIdFromDbString(toPreferenceDbID),
+                        parseCategoryFromDbString(toPreferenceDbID));
                 int weight = correlation.getValue();
-                this.preference.addCorrelation(new PreferenceCorrelation(toPreferenceID, weight));
+                this.preference.addCorrelation(new PreferenceCorrelation(toPreference, weight));
             }
         }
         
@@ -97,7 +92,7 @@ public class DDBPreferenceAdapter {
      * @param dbString
      * @return preference ID
      */
-    public static String parsePreferenceIDFromDBString(String dbString) {
+    public static String parsePreferenceIdFromDbString(String dbString) {
         return dbString.substring(dbString.indexOf(DB_CATEGORY_ID_SEPARATOR)
                 + DB_CATEGORY_ID_SEPARATOR.length());
     }
@@ -108,7 +103,7 @@ public class DDBPreferenceAdapter {
      * @param dbString
      * @return preference category
      */
-    public static PreferenceCategory parseCategoryFromDBString(String dbString) {
+    public static PreferenceCategory parseCategoryFromDbString(String dbString) {
         return PreferenceCategory.valueOf(dbString.substring(0,
                 dbString.indexOf(DB_CATEGORY_ID_SEPARATOR)));
     }
@@ -116,28 +111,25 @@ public class DDBPreferenceAdapter {
     /**
      * Generates the DynamoDB Item, if the Preference object has already been provided.
      * 
-     * @return
-     * @throws IllegalStateException if Preference object is null.
+     * @return DynamoDB Item
      */
     public Item toDBModel() {
         if (this.dbModel != null) {
             return this.dbModel;
         }
         
-        if (this.preference == null) {
-            throw new IllegalStateException(
-                    "You cannot create the DBModel without first providing a Preference object!");
-        }
-        
         Map<String, Integer> dbCorrelations = new HashMap<String, Integer>();
         for (PreferenceCorrelation correlation : this.preference.getCorrelations()) {
-            dbCorrelations.put(correlation.getToPreferenceID(), correlation.getWeight());
+            Preference correlatedPreference = correlation.getToPreference();
+            dbCorrelations.put(
+                    buildDbIdFromComponents(correlatedPreference.getID(),
+                            correlatedPreference.getCategory()), correlation.getWeight());
         }
         
         this.dbModel = new Item()
                 .withPrimaryKey(
                         PREFERENCE_ID_ATTRIBUTE,
-                        buildDBStringFromComponents(this.preference.getID(),
+                        buildDbIdFromComponents(this.preference.getID(),
                                 this.preference.getCategory()))
                 .withInt(POPULARITY_ATTRIBUTE, this.preference.getPopularity())
                 .withMap(CORRELATIONS_ATTRIBUTE, dbCorrelations);
@@ -148,10 +140,28 @@ public class DDBPreferenceAdapter {
     /**
      * Builds the DyanamoDB key String from a Preference object.
      * 
-     * @param preference
-     * @return DBString
+     * @param id
+     * @param category
+     * @return DB ID String
      */
-    public static String buildDBStringFromComponents(String id, PreferenceCategory category) {
+    public static String buildDbIdFromComponents(String id, PreferenceCategory category) {
         return String.format("%s%s%s", category, DB_CATEGORY_ID_SEPARATOR, id);
+    }
+    
+    /**
+     * Builds a DyanamoDB attribute path.
+     * 
+     * @param pathComponents
+     * @return attributePath
+     */
+    public static String buildDbAttributePath(String... pathComponents) {
+        StringBuilder builder = new StringBuilder(pathComponents[0]);
+        
+        for (int i = 1; i < pathComponents.length; i++) {
+            builder.append(".");
+            builder.append(pathComponents[i]);
+        }
+        
+        return builder.toString();
     }
 }

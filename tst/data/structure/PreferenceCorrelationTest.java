@@ -30,41 +30,14 @@ public class PreferenceCorrelationTest {
     }
     
     /**
-     * Tests the inc() method.
-     */
-    @Test
-    public void testIncrement() {
-        final int INITIAL_WEIGHT = 10;
-        PreferenceCorrelation correlation = new PreferenceCorrelation("123", INITIAL_WEIGHT);
-        
-        correlation.inc();
-        
-        assertEquals("The inc() method does not work as expected!", INITIAL_WEIGHT + 1,
-                correlation.getWeight());
-    }
-    
-    /**
-     * Tests the dec() method.
-     */
-    @Test
-    public void testDecrement() {
-        final int INITIAL_WEIGHT = 10;
-        PreferenceCorrelation correlation = new PreferenceCorrelation("123", INITIAL_WEIGHT);
-        
-        correlation.dec();
-        
-        assertEquals("The dec() method does not work as expected!", INITIAL_WEIGHT - 1,
-                correlation.getWeight());
-    }
-    
-    /**
      * Tests the getCorrelationRatio() method.
      */
     @Test
     public void testCorrelationRatio() {
         final int INITIAL_WEIGHT = 10;
         final int POPULARITY = 100;
-        PreferenceCorrelation correlation = new PreferenceCorrelation("123", INITIAL_WEIGHT);
+        PreferenceCorrelation correlation = new PreferenceCorrelation(new Preference("123",
+                PreferenceCategory.BOOKS), INITIAL_WEIGHT);
         
         assertEquals("The correlation ratio is not being calculated correctly!", INITIAL_WEIGHT
                 * 1.0 / POPULARITY, correlation.getCorrelationRatio(POPULARITY), 0.001);
@@ -77,7 +50,8 @@ public class PreferenceCorrelationTest {
     public void testCorrelationRatioZeroDenominator() {
         final int INITIAL_WEIGHT = 10;
         final int POPULARITY = 0;
-        PreferenceCorrelation correlation = new PreferenceCorrelation("123", INITIAL_WEIGHT);
+        PreferenceCorrelation correlation = new PreferenceCorrelation(new Preference("123",
+                PreferenceCategory.BOOKS), INITIAL_WEIGHT);
         
         assertEquals(
                 "The correlation ratio is not being calculated correctly when the popularity is 0!",
@@ -92,9 +66,10 @@ public class PreferenceCorrelationTest {
         final int W1 = 10;
         final int W2 = 20;
         final int W3 = 0;
-        PreferenceCorrelation c1 = new PreferenceCorrelation("123", W1);
-        PreferenceCorrelation c2 = new PreferenceCorrelation("123", W2);
-        PreferenceCorrelation c3 = new PreferenceCorrelation("123", W3);
+        Preference correlatedPreference = new Preference("123", PreferenceCategory.BOOKS);
+        PreferenceCorrelation c1 = new PreferenceCorrelation(correlatedPreference, W1);
+        PreferenceCorrelation c2 = new PreferenceCorrelation(correlatedPreference, W2);
+        PreferenceCorrelation c3 = new PreferenceCorrelation(correlatedPreference, W3);
         
         c1.mergeAll(Arrays.asList(new PreferenceCorrelation[] { c2, c3 }));
         
@@ -108,8 +83,10 @@ public class PreferenceCorrelationTest {
      */
     @Test
     public void testEquals() {
-        PreferenceCorrelation c1 = new PreferenceCorrelation("123", 10);
-        PreferenceCorrelation c2 = new PreferenceCorrelation("123", 20);
+        Preference correlatedPreference = new Preference("123", PreferenceCategory.BOOKS);
+        // Equals() should only be based on the destination preference, not the weight.
+        PreferenceCorrelation c1 = new PreferenceCorrelation(correlatedPreference, 10);
+        PreferenceCorrelation c2 = new PreferenceCorrelation(correlatedPreference, 20);
         
         // Test Symmetry of operation
         assertTrue("The two IDs were the same, but equals() returned false!", c1.equals(c2));
@@ -122,7 +99,8 @@ public class PreferenceCorrelationTest {
      */
     @Test
     public void testNotEqualsNull() {
-        PreferenceCorrelation c1 = new PreferenceCorrelation("123");
+        PreferenceCorrelation c1 = new PreferenceCorrelation(new Preference("123",
+                PreferenceCategory.BOOKS));
         
         assertFalse("The candidate was null, but equals() returned true!", c1.equals(null));
     }
@@ -133,8 +111,10 @@ public class PreferenceCorrelationTest {
      */
     @Test
     public void testNotEquals() {
-        PreferenceCorrelation c1 = new PreferenceCorrelation("123", 10);
-        PreferenceCorrelation c2 = new PreferenceCorrelation("456", 20);
+        PreferenceCorrelation c1 = new PreferenceCorrelation(new Preference("123",
+                PreferenceCategory.BOOKS), 10);
+        PreferenceCorrelation c2 = new PreferenceCorrelation(new Preference("456",
+                PreferenceCategory.BOOKS), 20);
         
         assertFalse("The candidate was had a different ID, but equals() returned true!",
                 c1.equals(c2));
@@ -145,8 +125,9 @@ public class PreferenceCorrelationTest {
      */
     @Test
     public void testHashCodeForEquivalents() {
-        PreferenceCorrelation c1 = new PreferenceCorrelation("123");
-        PreferenceCorrelation c2 = new PreferenceCorrelation("123");
+        Preference correlatedPreference = new Preference("123", PreferenceCategory.BOOKS);
+        PreferenceCorrelation c1 = new PreferenceCorrelation(correlatedPreference);
+        PreferenceCorrelation c2 = new PreferenceCorrelation(correlatedPreference);
         
         // First, validate assumption that these users are actually equivalent.
         assertEquals("Two identical Preference Correlations are not considered equivalent!", c1, c2);
@@ -160,7 +141,8 @@ public class PreferenceCorrelationTest {
      */
     @Test
     public void testHashCodeConsistency() {
-        PreferenceCorrelation c1 = new PreferenceCorrelation("123");
+        PreferenceCorrelation c1 = new PreferenceCorrelation(new Preference("123",
+                PreferenceCategory.BOOKS));
         
         int firstCode = c1.hashCode();
         

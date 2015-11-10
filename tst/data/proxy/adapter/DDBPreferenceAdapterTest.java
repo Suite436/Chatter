@@ -7,9 +7,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -26,9 +28,9 @@ import data.structure.PreferenceCorrelation;
 public class DDBPreferenceAdapterTest {
     
     private static final PreferenceCategory PREFERENCE_CATEGORY_TO_USE = PreferenceCategory.BOOKS;
-    private static final String PREFERENCE_ID = "Lord of the Rings";
+    private static final String PREFERENCE_ID = "LordOfTheRings";
     private static final int PREFERENCE_POPULARITY = 20;
-    private static final String CORRELATION_PREFERENCE_ID = "Harry Potter";
+    private static final String CORRELATION_PREFERENCE_ID = "HarryPotter";
     private static final int CORRELATION_WEIGHT = 10;
     
     private Preference testPreference;
@@ -41,22 +43,23 @@ public class DDBPreferenceAdapterTest {
      */
     @Before
     public void setup() {
-        testCorrelation = new PreferenceCorrelation(
-                DDBPreferenceAdapter.buildDBStringFromComponents(CORRELATION_PREFERENCE_ID,
-                        PREFERENCE_CATEGORY_TO_USE), CORRELATION_WEIGHT);
+        testCorrelation = new PreferenceCorrelation(new Preference(CORRELATION_PREFERENCE_ID,
+                PREFERENCE_CATEGORY_TO_USE), CORRELATION_WEIGHT);
         
-        List<PreferenceCorrelation> correlations = new ArrayList<PreferenceCorrelation>();
+        Set<PreferenceCorrelation> correlations = new HashSet<PreferenceCorrelation>();
         correlations.add(testCorrelation);
         
         Map<String, Integer> dbCorrelations = new HashMap<String, Integer>();
-        dbCorrelations.put(testCorrelation.getToPreferenceID(), testCorrelation.getWeight());
+        dbCorrelations.put(DDBPreferenceAdapter.buildDbIdFromComponents(testCorrelation
+                .getToPreference().getID(), testCorrelation.getToPreference().getCategory()),
+                testCorrelation.getWeight());
         
         testPreference = new Preference(PREFERENCE_ID, PREFERENCE_CATEGORY_TO_USE,
                 PREFERENCE_POPULARITY, correlations);
         testModel = new Item()
                 .withPrimaryKey(
                         DDBPreferenceAdapter.PREFERENCE_ID_ATTRIBUTE,
-                        DDBPreferenceAdapter.buildDBStringFromComponents(PREFERENCE_ID,
+                        DDBPreferenceAdapter.buildDbIdFromComponents(PREFERENCE_ID,
                                 PREFERENCE_CATEGORY_TO_USE))
                 .withMap(DDBPreferenceAdapter.CORRELATIONS_ATTRIBUTE, dbCorrelations)
                 .withInt(DDBPreferenceAdapter.POPULARITY_ATTRIBUTE, PREFERENCE_POPULARITY);
@@ -67,40 +70,32 @@ public class DDBPreferenceAdapterTest {
      */
     @Test
     public void testMissingModel() {
-        DDBPreferenceAdapter adapter = new DDBPreferenceAdapter();
-        
         boolean thrown = false;
         
         try {
-            adapter.toObject();
-        } catch (IllegalStateException e) {
+            DDBPreferenceAdapter adapter = new DDBPreferenceAdapter((Item) null);
+        } catch (IllegalArgumentException e) {
             thrown = true;
         }
         
-        assertTrue(
-                "The adapter was asked to provide a Preference object without a DynamoDB Item, but no exception was thrown!",
-                thrown);
+        assertTrue("A null DynamoDB Item was provided, but no exception was thrown!", thrown);
     }
     
     /**
-     * Tests that the toDBModel() method cannot be called without first setting the UserProfile
+     * Tests that the toDBModel() method cannot be called without first setting the Preference
      * object.
      */
     @Test
     public void testMissingObject() {
-        DDBPreferenceAdapter adapter = new DDBPreferenceAdapter();
-        
         boolean thrown = false;
         
         try {
-            adapter.toDBModel();
-        } catch (IllegalStateException e) {
+            DDBPreferenceAdapter adapter = new DDBPreferenceAdapter((Preference) null);
+        } catch (IllegalArgumentException e) {
             thrown = true;
         }
         
-        assertTrue(
-                "The adapter was asked to provide a DynamoDB Item without a Preference object, but no exception was thrown!",
-                thrown);
+        assertTrue("A null Preference object was provided, but no exception was thrown!", thrown);
     }
     
     /**
@@ -108,7 +103,7 @@ public class DDBPreferenceAdapterTest {
      */
     @Test
     public void testToDBModel() {
-        DDBPreferenceAdapter adapter = new DDBPreferenceAdapter().withObject(testPreference);
+        DDBPreferenceAdapter adapter = new DDBPreferenceAdapter(testPreference);
         Item result = adapter.toDBModel();
         
         assertEquals("The returned Item did not have the expected ID!",
@@ -134,7 +129,7 @@ public class DDBPreferenceAdapterTest {
      */
     @Test
     public void testToObject() {
-        DDBPreferenceAdapter adapter = new DDBPreferenceAdapter().withDBModel(testModel);
+        DDBPreferenceAdapter adapter = new DDBPreferenceAdapter(testModel);
         Preference result = adapter.toObject();
         
         assertEquals("The returned Preference did not have the expected ID!",
@@ -151,7 +146,7 @@ public class DDBPreferenceAdapterTest {
         Comparator<PreferenceCorrelation> comparator = new Comparator<PreferenceCorrelation>() {
             @Override
             public int compare(PreferenceCorrelation a, PreferenceCorrelation b) {
-                return a.getToPreferenceID().compareTo(b.getToPreferenceID());
+                return a.getToPreference().getID().compareTo(b.getToPreference().getID());
             }
         };
         
@@ -162,7 +157,7 @@ public class DDBPreferenceAdapterTest {
             PreferenceCorrelation expected = expectedCorrelations.get(i);
             PreferenceCorrelation actual = actualCorrelations.get(i);
             assertEquals("The returned Preference did not have the correct correlations!",
-                    expected.getToPreferenceID(), actual.getToPreferenceID());
+                    expected.getToPreference(), actual.getToPreference());
             assertEquals(
                     "The returned Preference's correlations did not have the correct weights!",
                     expected.getWeight(), actual.getWeight());

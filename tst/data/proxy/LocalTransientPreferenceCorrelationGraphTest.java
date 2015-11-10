@@ -6,7 +6,6 @@ import static org.junit.Assert.assertNull;
 import org.junit.Before;
 import org.junit.Test;
 
-import data.proxy.adapter.DDBPreferenceAdapter;
 import data.structure.Preference;
 import data.structure.PreferenceCategory;
 import data.structure.PreferenceCorrelation;
@@ -47,12 +46,11 @@ public class LocalTransientPreferenceCorrelationGraphTest {
         final Preference p2 = new Preference("2", PreferenceCategory.MOVIES);
         
         // Add a correlation from p1 to p2
-        p1.addCorrelation(new PreferenceCorrelation(DDBPreferenceAdapter
-                .buildDBStringFromComponents(p2.getID(), p2.getCategory())));
+        p1.addCorrelation(new PreferenceCorrelation(p2));
         
         // Write preferences to graph
-        graph.write(p1);
-        graph.write(p2);
+        graph.putPreference(p1);
+        graph.putPreference(p2);
         
         // Check returned preferences
         assertEquals("Preferences do not match!", p1,
@@ -61,10 +59,9 @@ public class LocalTransientPreferenceCorrelationGraphTest {
                 graph.getPreference(p2.getID(), p2.getCategory()));
         
         // Check correlation
-        assertEquals("The correlation was not preserved!",
-                DDBPreferenceAdapter.buildDBStringFromComponents(p2.getID(), p2.getCategory()),
-                graph.getPreference(p1.getID(), p1.getCategory()).getCorrelations().get(0)
-                        .getToPreferenceID());
+        assertEquals("The correlation was not preserved!", p2,
+                graph.getPreference(p1.getID(), p1.getCategory()).getCorrelations().iterator()
+                        .next().getToPreference());
         
         // Remove two preferences
         graph.delete(p1.getID(), p1.getCategory());
