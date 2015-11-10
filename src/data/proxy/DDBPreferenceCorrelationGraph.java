@@ -2,17 +2,10 @@ package data.proxy;
 
 import static data.proxy.adapter.DDBPreferenceAdapter.PREFERENCE_ID_ATTRIBUTE;
 
-import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Item;
-import com.amazonaws.services.dynamodbv2.document.Page;
-import com.amazonaws.services.dynamodbv2.document.ScanFilter;
-import com.amazonaws.services.dynamodbv2.document.ScanOutcome;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import com.amazonaws.services.dynamodbv2.document.spec.UpdateItemSpec;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
@@ -115,18 +108,4 @@ public class DDBPreferenceCorrelationGraph implements PreferenceCorrelationGraph
             return new DDBPreferenceAdapter(item).toObject();
         }
     }
-    
-    private List<Preference> getPreferences(Page<Item, ScanOutcome> page) {
-    	Iterator<Item> iterator = page.iterator();
-    	return Stream.generate(iterator::next).map(item -> new DDBPreferenceAdapter(item).toObject()).collect(Collectors.toList());
-    }
-
-	@Override
-	public Stream<List<Preference>> batchGetPreferences(
-			PreferenceCategory category, int batchSize) {
-		Stream<Page<Item, ScanOutcome>> rawStream = StreamSupport.stream(this.preferenceTable.scan(
-				new ScanFilter(PREFERENCE_ID_ATTRIBUTE).contains(category.toString()))
-			.pages().spliterator(), false);
-		return rawStream.map(page -> getPreferences(page));
-	}
 }

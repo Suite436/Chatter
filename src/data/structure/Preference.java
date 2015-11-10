@@ -143,16 +143,6 @@ public class Preference {
         return Collections.unmodifiableSet(this.correlations);
     }
     
-    public PreferenceCorrelation findCorrelation(Preference toPreference) {
-    	for (PreferenceCorrelation correlation : this.correlations) {
-    		if (correlation.getToPreference().equals(toPreference)) {
-    			return correlation;
-    		}
-    	}
-    	
-    	return null;
-    }
-    
     /**
      * Validates a correlation.
      * 
