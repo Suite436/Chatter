@@ -136,11 +136,11 @@ public class LocalTransientPreferenceCorrelationGraph implements PreferenceCorre
     }
 
 	@Override
-	public Stream<List<Preference>> batchGetPreferences(
+	public Iterator<List<Preference>> batchGetPreferences(
 			PreferenceCategory category, int batchSize) {
 		Iterator<List<Preference>> preferenceBatches = Iterators.partition(preferences.get(category).values().iterator(), batchSize);
 		Iterable<List<Preference>> iterable = () -> preferenceBatches;
-		return StreamSupport.stream(iterable.spliterator(), false);
+		return StreamSupport.stream(iterable.spliterator(), false).iterator();
 	}
     
 }

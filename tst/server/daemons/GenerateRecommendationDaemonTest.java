@@ -17,6 +17,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import data.proxy.LocalTransientPreferenceCorrelationGraph;
+import data.proxy.PreferenceCorrelationGraph;
+import data.proxy.request.UpdatePreferenceRequest;
+import data.proxy.request.UpdatePreferenceRequest.UpdateAction;
 import data.structure.Preference;
 import data.structure.PreferenceCategory;
 import data.structure.PreferenceCorrelation;
@@ -89,7 +92,7 @@ public class GenerateRecommendationDaemonTest {
 		correlationGraph.putPreference(xenocidePref);
 		
 		
-		Map<Preference, Double> preferenceScores = daemon.getBatchScores(userProfile, 
+		Map<Preference, Double> preferenceScores = daemon.calculateCorrelationScores(userProfile, 
 				Arrays.asList(harryPotterPref, endersGamePref, sevenSunsPref, xenocidePref), PreferenceCategory.BOOKS);
 		assertEquals(2, preferenceScores.size());
 		
@@ -125,7 +128,7 @@ public class GenerateRecommendationDaemonTest {
 		correlationGraph.putPreference(harryPotterPref);
 		correlationGraph.putPreference(endersGamePref);
 		
-		Map<Preference, Double> preferenceScores = daemon.getBatchScores(userProfile, 
+		Map<Preference, Double> preferenceScores = daemon.calculateCorrelationScores(userProfile, 
 				Arrays.asList(harryPotterPref, endersGamePref), PreferenceCategory.BOOKS);
 		assertTrue(preferenceScores.isEmpty());		
 	}
@@ -182,7 +185,7 @@ public class GenerateRecommendationDaemonTest {
 		correlationGraph.putPreference(xenocidePref);
 		
 		
-		Map<Preference, Double> preferenceScores = daemon.getBatchScores(userProfile, 
+		Map<Preference, Double> preferenceScores = daemon.calculateCorrelationScores(userProfile, 
 				Arrays.asList(harryPotterPref, endersGamePref, sevenSunsPref, xenocidePref), PreferenceCategory.BOOKS);
 		assertEquals(2, preferenceScores.size());
 		
@@ -204,7 +207,7 @@ public class GenerateRecommendationDaemonTest {
 		Map<PreferenceCategory, Set<Preference>> userPreferences = new HashMap<PreferenceCategory, Set<Preference>>();
 		UserProfile userProfile = new UserProfile("bposerow", userPreferences);
 		
-		Map<Preference, Double> preferenceScores = daemon.getBatchScores(userProfile, new ArrayList<Preference>(), PreferenceCategory.BOOKS);
+		Map<Preference, Double> preferenceScores = daemon.calculateCorrelationScores(userProfile, new ArrayList<Preference>(), PreferenceCategory.BOOKS);
 		
 		assertTrue(preferenceScores.isEmpty());
 	}
@@ -221,5 +224,210 @@ public class GenerateRecommendationDaemonTest {
 		testSimpleRecommendationBatch();
 	}
 	
+	@Test 
+	public void testOneUserPrefUpdate() {
+		Preference harryPotterPref = new Preference("Harry Potter", PreferenceCategory.BOOKS, 100);
+		Preference endersGamePref = new Preference("Ender's Game", PreferenceCategory.BOOKS, 50);
+		
+		Preference sevenSunsPref = new Preference("Saga of the Seven Suns", PreferenceCategory.BOOKS, 15);
+		Preference xenocidePref = new Preference("Xenocide", PreferenceCategory.BOOKS, 20);
+		
+		
+		PreferenceCorrelation hpToEg = new PreferenceCorrelation(endersGamePref, 10);
+		PreferenceCorrelation egToHp = new PreferenceCorrelation(harryPotterPref, 10);
+		
+		harryPotterPref.addCorrelation(hpToEg);
+		endersGamePref.addCorrelation(egToHp);
+		
+		PreferenceCorrelation hpToSevenSuns = new PreferenceCorrelation(sevenSunsPref, 1);
+		PreferenceCorrelation hpToXenocide = new PreferenceCorrelation(xenocidePref, 2);
+		harryPotterPref.addAllCorrelations(Arrays.asList(hpToSevenSuns, hpToXenocide));
+		
+		PreferenceCorrelation egToSevenSuns = new PreferenceCorrelation(sevenSunsPref, 5);
+		PreferenceCorrelation egToXenocide = new PreferenceCorrelation(xenocidePref, 15);
+		endersGamePref.addAllCorrelations(Arrays.asList(egToSevenSuns, egToXenocide));
+		
+		
+		PreferenceCorrelation sevenSunsToEg = new PreferenceCorrelation(endersGamePref, 5);
+		PreferenceCorrelation sevenSunsToXenocide = new PreferenceCorrelation(xenocidePref, 4);
+		PreferenceCorrelation sevenSunsToHP = new PreferenceCorrelation(harryPotterPref, 1);
+		sevenSunsPref.addAllCorrelations(Arrays.asList(sevenSunsToEg, sevenSunsToXenocide, sevenSunsToHP));
+		
+		
+		PreferenceCorrelation xenocideToEg = new PreferenceCorrelation(endersGamePref, 15);
+		PreferenceCorrelation xenocideToSevenSuns = new PreferenceCorrelation(sevenSunsPref, 4);
+		PreferenceCorrelation xenocideToHP = new PreferenceCorrelation(harryPotterPref, 2);
+		xenocidePref.addAllCorrelations(Arrays.asList(xenocideToEg, xenocideToSevenSuns, xenocideToHP));
+		
+		
+		Map<PreferenceCategory, Set<Preference>> userPreferences = ImmutableMap.of(PreferenceCategory.BOOKS, 
+				ImmutableSet.of(harryPotterPref, endersGamePref));
+		
+		UserProfile userProfile = new UserProfile("bposerow", userPreferences);
+	    
+		PreferenceCorrelationGraph correlationGraph = new LocalTransientPreferenceCorrelationGraph();
+		correlationGraph.putPreference(harryPotterPref);
+		correlationGraph.putPreference(endersGamePref);
+		correlationGraph.putPreference(sevenSunsPref);
+		correlationGraph.putPreference(xenocidePref);
+		
+		Map<Preference, Double> originalCorrelationScores = daemon.calculateCorrelationScores(userProfile, 
+				Arrays.asList(harryPotterPref, endersGamePref, sevenSunsPref, xenocidePref), PreferenceCategory.BOOKS);
+
+		UpdatePreferenceRequest req = new UpdatePreferenceRequest(harryPotterPref);
+		req.updatePopularity(UpdateAction.INC_CORRELATION);
+		req.addCorrelationUpdate(hpToXenocide, UpdateAction.INC_CORRELATION);
+		
+		Map<Preference, Double> newCorrelationScores = daemon.getUpdatedPreferenceScores(userProfile, correlationGraph,
+				Arrays.asList(req), 
+				PreferenceCategory.BOOKS, originalCorrelationScores);
+		
+		assertEquals(2, newCorrelationScores.size());
+		
+		assertTrue(newCorrelationScores.containsKey(sevenSunsPref));
+		assertTrue(newCorrelationScores.containsKey(xenocidePref));
+		
+		assertTrue(Math.abs(0.1099 - newCorrelationScores.get(sevenSunsPref)) < TOLERANCE);
+		assertTrue(Math.abs(0.329703 - newCorrelationScores.get(xenocidePref)) < TOLERANCE);
+		
+	}
+	
+	
+	@Test 
+	public void testOneNonUserPrefUpdate() {
+		Preference harryPotterPref = new Preference("Harry Potter", PreferenceCategory.BOOKS, 100);
+		Preference endersGamePref = new Preference("Ender's Game", PreferenceCategory.BOOKS, 50);
+		
+		Preference sevenSunsPref = new Preference("Saga of the Seven Suns", PreferenceCategory.BOOKS, 15);
+		Preference xenocidePref = new Preference("Xenocide", PreferenceCategory.BOOKS, 20);
+		
+		
+		PreferenceCorrelation hpToEg = new PreferenceCorrelation(endersGamePref, 10);
+		PreferenceCorrelation egToHp = new PreferenceCorrelation(harryPotterPref, 10);
+		
+		harryPotterPref.addCorrelation(hpToEg);
+		endersGamePref.addCorrelation(egToHp);
+		
+		PreferenceCorrelation hpToSevenSuns = new PreferenceCorrelation(sevenSunsPref, 1);
+		PreferenceCorrelation hpToXenocide = new PreferenceCorrelation(xenocidePref, 2);
+		harryPotterPref.addAllCorrelations(Arrays.asList(hpToSevenSuns, hpToXenocide));
+		
+		PreferenceCorrelation egToSevenSuns = new PreferenceCorrelation(sevenSunsPref, 5);
+		PreferenceCorrelation egToXenocide = new PreferenceCorrelation(xenocidePref, 15);
+		endersGamePref.addAllCorrelations(Arrays.asList(egToSevenSuns, egToXenocide));
+		
+		
+		PreferenceCorrelation sevenSunsToEg = new PreferenceCorrelation(endersGamePref, 5);
+		PreferenceCorrelation sevenSunsToXenocide = new PreferenceCorrelation(xenocidePref, 4);
+		PreferenceCorrelation sevenSunsToHP = new PreferenceCorrelation(harryPotterPref, 1);
+		sevenSunsPref.addAllCorrelations(Arrays.asList(sevenSunsToEg, sevenSunsToXenocide, sevenSunsToHP));
+		
+		
+		PreferenceCorrelation xenocideToEg = new PreferenceCorrelation(endersGamePref, 15);
+		PreferenceCorrelation xenocideToSevenSuns = new PreferenceCorrelation(sevenSunsPref, 4);
+		PreferenceCorrelation xenocideToHP = new PreferenceCorrelation(harryPotterPref, 2);
+		xenocidePref.addAllCorrelations(Arrays.asList(xenocideToEg, xenocideToSevenSuns, xenocideToHP));
+		
+		
+		Map<PreferenceCategory, Set<Preference>> userPreferences = ImmutableMap.of(PreferenceCategory.BOOKS, 
+				ImmutableSet.of(harryPotterPref, endersGamePref));
+		
+		UserProfile userProfile = new UserProfile("bposerow", userPreferences);
+	    
+		PreferenceCorrelationGraph correlationGraph = new LocalTransientPreferenceCorrelationGraph();
+		correlationGraph.putPreference(harryPotterPref);
+		correlationGraph.putPreference(endersGamePref);
+		correlationGraph.putPreference(sevenSunsPref);
+		correlationGraph.putPreference(xenocidePref);
+		
+		Map<Preference, Double> originalCorrelationScores = daemon.calculateCorrelationScores(userProfile, 
+				Arrays.asList(harryPotterPref, endersGamePref, sevenSunsPref, xenocidePref), PreferenceCategory.BOOKS);
+
+		UpdatePreferenceRequest req = new UpdatePreferenceRequest(sevenSunsPref);
+		req.updatePopularity(UpdateAction.INC_CORRELATION);
+		req.addCorrelationUpdate(sevenSunsToEg, UpdateAction.INC_CORRELATION);
+		
+		Map<Preference, Double> newCorrelationScores = daemon.getUpdatedPreferenceScores(userProfile, correlationGraph,
+				Arrays.asList(req), 
+				PreferenceCategory.BOOKS, originalCorrelationScores);
+		
+		assertEquals(2, newCorrelationScores.size());
+		
+		assertTrue(newCorrelationScores.containsKey(sevenSunsPref));
+		assertTrue(newCorrelationScores.containsKey(xenocidePref));
+		
+		assertTrue(Math.abs(0.13 - newCorrelationScores.get(sevenSunsPref)) < TOLERANCE);
+		assertTrue(Math.abs(0.32- newCorrelationScores.get(xenocidePref)) < TOLERANCE);		
+	}
+	
+	
+	@Test 
+	public void testOneNonUserMutiCorrelationUpdate() {
+		Preference harryPotterPref = new Preference("Harry Potter", PreferenceCategory.BOOKS, 100);
+		Preference endersGamePref = new Preference("Ender's Game", PreferenceCategory.BOOKS, 50);
+		
+		Preference sevenSunsPref = new Preference("Saga of the Seven Suns", PreferenceCategory.BOOKS, 15);
+		Preference xenocidePref = new Preference("Xenocide", PreferenceCategory.BOOKS, 20);
+		
+		
+		PreferenceCorrelation hpToEg = new PreferenceCorrelation(endersGamePref, 10);
+		PreferenceCorrelation egToHp = new PreferenceCorrelation(harryPotterPref, 10);
+		
+		harryPotterPref.addCorrelation(hpToEg);
+		endersGamePref.addCorrelation(egToHp);
+		
+		PreferenceCorrelation hpToSevenSuns = new PreferenceCorrelation(sevenSunsPref, 1);
+		PreferenceCorrelation hpToXenocide = new PreferenceCorrelation(xenocidePref, 2);
+		harryPotterPref.addAllCorrelations(Arrays.asList(hpToSevenSuns, hpToXenocide));
+		
+		PreferenceCorrelation egToSevenSuns = new PreferenceCorrelation(sevenSunsPref, 5);
+		PreferenceCorrelation egToXenocide = new PreferenceCorrelation(xenocidePref, 15);
+		endersGamePref.addAllCorrelations(Arrays.asList(egToSevenSuns, egToXenocide));
+		
+		
+		PreferenceCorrelation sevenSunsToEg = new PreferenceCorrelation(endersGamePref, 5);
+		PreferenceCorrelation sevenSunsToXenocide = new PreferenceCorrelation(xenocidePref, 4);
+		PreferenceCorrelation sevenSunsToHP = new PreferenceCorrelation(harryPotterPref, 1);
+		sevenSunsPref.addAllCorrelations(Arrays.asList(sevenSunsToEg, sevenSunsToXenocide, sevenSunsToHP));
+		
+		
+		PreferenceCorrelation xenocideToEg = new PreferenceCorrelation(endersGamePref, 15);
+		PreferenceCorrelation xenocideToSevenSuns = new PreferenceCorrelation(sevenSunsPref, 4);
+		PreferenceCorrelation xenocideToHP = new PreferenceCorrelation(harryPotterPref, 2);
+		xenocidePref.addAllCorrelations(Arrays.asList(xenocideToEg, xenocideToSevenSuns, xenocideToHP));
+		
+		
+		Map<PreferenceCategory, Set<Preference>> userPreferences = ImmutableMap.of(PreferenceCategory.BOOKS, 
+				ImmutableSet.of(harryPotterPref, endersGamePref));
+		
+		UserProfile userProfile = new UserProfile("bposerow", userPreferences);
+	    
+		PreferenceCorrelationGraph correlationGraph = new LocalTransientPreferenceCorrelationGraph();
+		correlationGraph.putPreference(harryPotterPref);
+		correlationGraph.putPreference(endersGamePref);
+		correlationGraph.putPreference(sevenSunsPref);
+		correlationGraph.putPreference(xenocidePref);
+		
+		Map<Preference, Double> originalCorrelationScores = daemon.calculateCorrelationScores(userProfile, 
+				Arrays.asList(harryPotterPref, endersGamePref, sevenSunsPref, xenocidePref), PreferenceCategory.BOOKS);
+
+		UpdatePreferenceRequest req = new UpdatePreferenceRequest(sevenSunsPref);
+		req.updatePopularity(UpdateAction.INC_CORRELATION);
+		req.addCorrelationUpdate(sevenSunsToEg, UpdateAction.INC_CORRELATION);
+		req.addCorrelationUpdate(sevenSunsToHP, UpdateAction.DEC_CORRELATION);
+		
+		
+		Map<Preference, Double> newCorrelationScores = daemon.getUpdatedPreferenceScores(userProfile, correlationGraph,
+				Arrays.asList(req), 
+				PreferenceCategory.BOOKS, originalCorrelationScores);
+		
+		assertEquals(2, newCorrelationScores.size());
+		
+		assertTrue(newCorrelationScores.containsKey(sevenSunsPref));
+		assertTrue(newCorrelationScores.containsKey(xenocidePref));
+		
+		assertTrue(Math.abs(0.12 - newCorrelationScores.get(sevenSunsPref)) < TOLERANCE);
+		assertTrue(Math.abs(0.32 - newCorrelationScores.get(xenocidePref)) < TOLERANCE);		
+	}
 }
 

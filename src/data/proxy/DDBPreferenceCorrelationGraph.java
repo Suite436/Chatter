@@ -122,11 +122,11 @@ public class DDBPreferenceCorrelationGraph implements PreferenceCorrelationGraph
     }
 
 	@Override
-	public Stream<List<Preference>> batchGetPreferences(
+	public Iterator<List<Preference>> batchGetPreferences(
 			PreferenceCategory category, int batchSize) {
 		Stream<Page<Item, ScanOutcome>> rawStream = StreamSupport.stream(this.preferenceTable.scan(
 				new ScanFilter(PREFERENCE_ID_ATTRIBUTE).contains(category.toString()))
 			.pages().spliterator(), false);
-		return rawStream.map(page -> getPreferences(page));
+		return rawStream.map(page -> getPreferences(page)).iterator();
 	}
 }

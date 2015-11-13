@@ -1,5 +1,6 @@
 package data.proxy;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -20,7 +21,7 @@ public interface PreferenceCorrelationGraph {
      */
     public Preference getPreference(String id, PreferenceCategory category);
  
-    public Stream<List<Preference>> batchGetPreferences(PreferenceCategory category, int batchSize);
+    public Iterator<List<Preference>> batchGetPreferences(PreferenceCategory category, int batchSize);
     
     /**
      * Writes a Preference to the graph.
