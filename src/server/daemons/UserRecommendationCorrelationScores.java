@@ -17,38 +17,98 @@ import data.structure.PreferenceCategory;
 import data.structure.PreferenceCorrelation;
 import data.structure.UserProfile;
 
+/**
+ * Encapsulates total correlation scores between each given Preference and all user
+ *    preferences for a given user.  Used to generate recommendations for that user.
+ *    Allows updates to these correlation scores based on UpdatePreferenceRequest(s).  
+ *    Provides operations to aggregate these correlation scores to aid in determining
+ *    which Preference should be recommended to a given user.
+ */
 public class UserRecommendationCorrelationScores {
 	private final Map<Preference, Double> correlationScores;
 	private final UserProfile user;
 	
+	/**
+	 * 
+	 * @param correlationScores Mapping from a non-user preference to the total correlation
+	 *      score, i.e.
+	 *      sum(weight/popularity) over all user preferences
+	 * @param user Contains all user preferences and basic user information
+	 */
 	public UserRecommendationCorrelationScores(Map<Preference, Double> correlationScores,
 			UserProfile user) {
 		this.correlationScores = correlationScores;
 		this.user = user;
 	}
 	
-	public UserRecommendationCorrelationScores applyPreferenceUpdate(UpdatePreferenceRequest update) {
+	/**
+	 * Update correlation scores based on UpdatePreferenceRequest
+	 * 
+	 * Note, there are a few implicit assumptions here 
+	 * a) The Preference and PreferenceCorrelation objects have already had their weights 
+	 *     and popularities updated as the result
+	 *    of the effect of the UpdatePreferenceRequest before this method is called.  So
+	 *    the code here uses the weights and correlations associated with these objects as the
+	 *    "new" weights and popularities and then uses the UpdatePreferenceRequest to derive
+	 *    the previous values of the popularities and weights. 
+	 *  b) I am also assuming that the correlation scores are being updated synchronously directly after
+	 *    the weights and popularities are updated. 
+	 *  c) There is no support here for reentrancy so I assume these events will only be applied once.
+	 *  These assumptions were made for simplicity for now.  If any of these assumptions are wrong, 
+	 *   this logic will break, but in that case, we will need to start to attach previous popularities
+	 *    and weights to UpdatePreferenceRequest(s) and/or we will need to keep track of which events
+	 *    we have already applied, perhaps through versioning or logging.
+	 *    
+	 * 
+	 * @param update  UpdatePreferenceRequest which represents a popularity change
+	 *             in a given preference and its associated correlation/weight changes
+	 * @return This object, modified as a result of the correlation score change
+	 */
+	public UserRecommendationCorrelationScores applyPreferenceUpdate(
+			UpdatePreferenceRequest update) {
 		Preference targetPref = update.getPreferenceToUpdate();
 		PreferenceCategory preferenceCategory = targetPref.getCategory();
+		
+		if (targetPref == null || preferenceCategory == null) {
+			throw new RuntimeException("Dude, your request is invalid");
+		}
 		
 		// For each correlation update, match up preference to UpdateAction
 		Map<Preference, UpdateAction> correlationUpdates = update.getCorrelationUpdates().entrySet().stream()
 			       .collect(Collectors.toMap(entry -> entry.getKey().getToPreference(), 
 			    		   entry -> entry.getValue()));
 			
-		Set<PreferenceCorrelation> allCorrelations = update.getPreferenceToUpdate().getCorrelations();
+		Set<PreferenceCorrelation> allCorrelations = targetPref.getCorrelations();
 		
+		if (allCorrelations == null) {
+			throw new RuntimeException("Dude, you need correlations configured here");
+		}
+		
+		// We need to process all correlations that are currently associated with the
+		//   target preference, i.e the preference with a popularity update
 		for (PreferenceCorrelation prefCorrelation : allCorrelations) {
 			Preference correlatedPreference = prefCorrelation.getToPreference();
 		
+			// Assume that weight change is already applied to correlation and use the
+			//   current value as the new value
 			double newWeight = prefCorrelation.getWeight();
 			
+			// Back into the original weight by effectively undoing the UpdateAction
 			double originalWeight = getOriginalCorrelationWeight(correlationUpdates,
 					correlatedPreference, newWeight);
 			
+			// Group together various fields that are useful in the succeeding calculations
 			WeightChange weightChange = new WeightChange(targetPref, correlatedPreference,
 					originalWeight, newWeight);
 			
+			// User preference popularity updates need to be handled differently from updates
+			//   to preferences that don't belong to the user.  User preference popularity
+			//   updates result in changes to denominator (popularity) and potentially the numerator (weight)
+			//    of each individual
+			//   correlation score and have to be applied to all non-user preferences associated
+			//   with that user preference.  Non user preferences popularity updates will only
+			//   affect the correlation score of that preference and can only potentially affect the
+			//   numerator (weight) of the correlation score
 			if (isUserPreference(targetPref, preferenceCategory)) {
 				updateCorrelationScoresBasedOnUserPreferenceUpdate(
 						(double) update.getPopularityUpdate().getDelta(), weightChange);
@@ -63,6 +123,13 @@ public class UserRecommendationCorrelationScores {
 		return this;
 	}
 	
+	/**
+	 * 
+	 * @param popularityDelta  Change in popularity associated with user preference in UpdatePreferenceRequest
+	 *     which is being used to change correlation scores
+	 * @param weightChange Represents parameters associated with a change in weight with one
+	 *          correlation of a given preference
+	 */
 	private void updateCorrelationScoresBasedOnUserPreferenceUpdate(
 			double popularityDelta, WeightChange weightChange) {
 		Preference targetPref = weightChange.getSourcePreference();
@@ -72,19 +139,43 @@ public class UserRecommendationCorrelationScores {
 		double originalWeight = weightChange.getOriginalWeight();
 		double newWeight = weightChange.getNewWeight();
 		
-		double originalPopularity = newPopularity - popularityDelta /* update.getPopularityUpdate().getDelta() */;
+		// Effectively "undo" the result of applying the UpdatePreferenceRequest to the 
+		//   popularity of the Preference object
+		double originalPopularity = newPopularity - popularityDelta;
 		
+		// We are only interested in changes in weights in preferences that don't already
+		//   belong to this user
 		if (! isUserPreference(correlatedPref, preferenceCategory)) {
+			// Adjust current correlation score of this correlated preference by taking into
+			//   account both the weight change of this correlated preference as well as the 
+			//   popularity change of the associated user preference
 			correlationScores.compute(correlatedPref, 
 				(key, value) ->
 		             getNewCorrelationScore(value, originalWeight, newWeight, originalPopularity, newPopularity));
 		}
 	}
 	
+	/**
+	 * Simply returns true if the targetPref is one of the user's current preferences, false otherwise
+	 * 
+	 * @param targetPref
+	 * @param preferenceCategory
+	 * @return
+	 */
 	private boolean isUserPreference(Preference targetPref, PreferenceCategory preferenceCategory) {
 		return user.getPreferencesForCategory(preferenceCategory).contains(targetPref);
 	}
 	
+	/**
+	 * Backs into original correlation score by undoing effect of correlation update
+	 *    contained within a UpdatePreferenceRequest.
+	 * 
+	 * @param correlationUpdates Matches a correlated Preference to the associated UpdateAction,
+	 *     basically a flattening of the UpdatePreferenceRequest
+	 * @param correlatedPreference 
+	 * @param newWeight
+	 * @return
+	 */
 	private double getOriginalCorrelationWeight(
 			Map<Preference, UpdateAction> correlationUpdates,
 			Preference correlatedPreference, double newWeight) {
@@ -93,6 +184,12 @@ public class UserRecommendationCorrelationScores {
 					newWeight;
 	}
 	
+	/**
+	 * Update correlation score of a given non-user preference by applying the weight change
+	 *   that it had with a particular user preference.
+	 * 
+	 * @param weightChange
+	 */
 	private void updateCorrelationScoresBasedOnCorrelatedPreferenceUpdate(
 			WeightChange weightChange) {
 		Preference correlatedPreference = weightChange.getDestinationPreference();
@@ -103,6 +200,19 @@ public class UserRecommendationCorrelationScores {
 						weightChange.getNewWeight(), originalPopularity, originalPopularity));
 	}
 	
+	/**
+	 * Adjusts current correlation score of a given preference by taking one weight
+	 * change and one associated optional popularity change and adjust the total correlation 
+	 *  score accordingly.  
+	 * 
+	 * @param originalScore  Correlation score before this update was applied
+	 * @param originalWeight  Original weight of non-user correlated preference
+	 * @param newWeight  New weight of non-user correlated preference
+	 * @param originalPopularity  Original popularity of user preference
+	 * @param newPopularity  New popularity of user preference, might be the same as original
+	 *              popularity if the user preference popularity did not change
+	 * @return
+	 */
 	private double getNewCorrelationScore(Double originalScore, double originalWeight, 
 			double newWeight, double originalPopularity, double newPopularity) {
 		return (originalScore == null) ? newWeight / newPopularity :
@@ -128,87 +238,11 @@ public class UserRecommendationCorrelationScores {
 		Entry<Preference, Double> maxEntry = Collections.max(correlationScores.entrySet(), entryComparator);
 		return Optional.of(new Tuple2<>(maxEntry.getKey(), maxEntry.getValue()));
 	}
-	
-	private static class WeightChange {
-		private final Preference sourcePreference;
-		private final Preference destinationPreference;
-		private final double originalWeight;
-		private final double newWeight;
-		
-		public WeightChange(Preference sourcePreference,
-				Preference destinationPreference, double originalWeight,
-				double newWeight) {
-			super();
-			this.sourcePreference = sourcePreference;
-			this.destinationPreference = destinationPreference;
-			this.originalWeight = originalWeight;
-			this.newWeight = newWeight;
-		}
-		
-		public Preference getSourcePreference() {
-			return sourcePreference;
-		}
-		public Preference getDestinationPreference() {
-			return destinationPreference;
-		}
-		public double getOriginalWeight() {
-			return originalWeight;
-		}
-		public double getNewWeight() {
-			return newWeight;
-		}
 
-		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = 1;
-			result = prime
-					* result
-					+ ((destinationPreference == null) ? 0
-							: destinationPreference.hashCode());
-			long temp;
-			temp = Double.doubleToLongBits(newWeight);
-			result = prime * result + (int) (temp ^ (temp >>> 32));
-			temp = Double.doubleToLongBits(originalWeight);
-			result = prime * result + (int) (temp ^ (temp >>> 32));
-			result = prime
-					* result
-					+ ((sourcePreference == null) ? 0 : sourcePreference
-							.hashCode());
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (this == obj)
-				return true;
-			if (obj == null)
-				return false;
-			if (getClass() != obj.getClass())
-				return false;
-			WeightChange other = (WeightChange) obj;
-			
-			if (destinationPreference == null) {
-				if (other.destinationPreference != null)
-					return false;
-			} else if (!destinationPreference
-					.equals(other.destinationPreference))
-				return false;
-			if (Double.doubleToLongBits(newWeight) != Double
-					.doubleToLongBits(other.newWeight))
-				return false;
-			if (Double.doubleToLongBits(originalWeight) != Double
-					.doubleToLongBits(other.originalWeight))
-				return false;
-			if (sourcePreference == null) {
-				if (other.sourcePreference != null)
-					return false;
-			} else if (!sourcePreference.equals(other.sourcePreference))
-				return false;
-			return true;
-		}
-	}
-
+	/**
+	 * 
+	 * @return  Underlying scores by Preference
+	 */
 	public final Map<Preference, Double> getCorrelationScores() {
 		return new HashMap<Preference, Double>(correlationScores);
 	}
