@@ -27,7 +27,7 @@ import data.structure.Recommendation;
 import data.structure.UserProfile;
 
 public class GenerateRecommendationDaemonTest {
-	private final static double TOLERANCE = 0.001;
+	private final static double TOLERANCE = 0.0001;
 	
 	private GenerateRecommendationDaemon daemon = null;
 	
@@ -93,7 +93,7 @@ public class GenerateRecommendationDaemonTest {
 		
 		
 		Map<Preference, Double> preferenceScores = daemon.calculateCorrelationScores(userProfile, 
-				Arrays.asList(harryPotterPref, endersGamePref, sevenSunsPref, xenocidePref), PreferenceCategory.BOOKS);
+				Arrays.asList(harryPotterPref, endersGamePref, sevenSunsPref, xenocidePref), PreferenceCategory.BOOKS).getCorrelationScores();
 		assertEquals(2, preferenceScores.size());
 		
 		assertTrue(Math.abs(0.32 - preferenceScores.get(xenocidePref)) < TOLERANCE);
@@ -129,13 +129,13 @@ public class GenerateRecommendationDaemonTest {
 		correlationGraph.putPreference(endersGamePref);
 		
 		Map<Preference, Double> preferenceScores = daemon.calculateCorrelationScores(userProfile, 
-				Arrays.asList(harryPotterPref, endersGamePref), PreferenceCategory.BOOKS);
+				Arrays.asList(harryPotterPref, endersGamePref), PreferenceCategory.BOOKS).getCorrelationScores();
 		assertTrue(preferenceScores.isEmpty());		
 	}
 	
 	/**
 	 * Test to make sure that a Preference without associated correlations, in this case the Saga of the Seven Suns Preference, still works as expected,
-	 *    in this case the score should come out as 0
+	 *    in this case there should be no correlation score for this preference
 	 */
 	@Test
 	public void testPreferenceMissingCorrelation() {
@@ -186,12 +186,10 @@ public class GenerateRecommendationDaemonTest {
 		
 		
 		Map<Preference, Double> preferenceScores = daemon.calculateCorrelationScores(userProfile, 
-				Arrays.asList(harryPotterPref, endersGamePref, sevenSunsPref, xenocidePref), PreferenceCategory.BOOKS);
-		assertEquals(2, preferenceScores.size());
+				Arrays.asList(harryPotterPref, endersGamePref, sevenSunsPref, xenocidePref), PreferenceCategory.BOOKS).getCorrelationScores();
+		assertEquals(1, preferenceScores.size());
 		
 		assertTrue(Math.abs(0.32 - preferenceScores.get(xenocidePref)) < TOLERANCE);
-		assertTrue(Math.abs(0.0 - preferenceScores.get(sevenSunsPref)) < TOLERANCE);
-		
 		
 		Optional<Recommendation> recommendation = daemon.getRecommendation(PreferenceCategory.BOOKS, userProfile, correlationGraph);
 		
@@ -207,7 +205,8 @@ public class GenerateRecommendationDaemonTest {
 		Map<PreferenceCategory, Set<Preference>> userPreferences = new HashMap<PreferenceCategory, Set<Preference>>();
 		UserProfile userProfile = new UserProfile("bposerow", userPreferences);
 		
-		Map<Preference, Double> preferenceScores = daemon.calculateCorrelationScores(userProfile, new ArrayList<Preference>(), PreferenceCategory.BOOKS);
+		Map<Preference, Double> preferenceScores = daemon.calculateCorrelationScores(userProfile, new ArrayList<Preference>(), 
+				PreferenceCategory.BOOKS).getCorrelationScores();
 		
 		assertTrue(preferenceScores.isEmpty());
 	}
@@ -271,24 +270,23 @@ public class GenerateRecommendationDaemonTest {
 		correlationGraph.putPreference(sevenSunsPref);
 		correlationGraph.putPreference(xenocidePref);
 		
-		Map<Preference, Double> originalCorrelationScores = daemon.calculateCorrelationScores(userProfile, 
+		UserRecommendationCorrelationScores originalCorrelationScores = daemon.calculateCorrelationScores(userProfile, 
 				Arrays.asList(harryPotterPref, endersGamePref, sevenSunsPref, xenocidePref), PreferenceCategory.BOOKS);
 
 		UpdatePreferenceRequest req = new UpdatePreferenceRequest(harryPotterPref);
 		req.updatePopularity(UpdateAction.INC_CORRELATION);
 		req.addCorrelationUpdate(hpToXenocide, UpdateAction.INC_CORRELATION);
 		
-		Map<Preference, Double> newCorrelationScores = daemon.getUpdatedPreferenceScores(userProfile, correlationGraph,
-				Arrays.asList(req), 
-				PreferenceCategory.BOOKS, originalCorrelationScores);
+		Map<Preference, Double> newCorrelationScores = originalCorrelationScores
+				.applyPreferenceUpdate(req).getCorrelationScores();
 		
 		assertEquals(2, newCorrelationScores.size());
 		
 		assertTrue(newCorrelationScores.containsKey(sevenSunsPref));
 		assertTrue(newCorrelationScores.containsKey(xenocidePref));
 		
-		assertTrue(Math.abs(0.1099 - newCorrelationScores.get(sevenSunsPref)) < TOLERANCE);
-		assertTrue(Math.abs(0.329703 - newCorrelationScores.get(xenocidePref)) < TOLERANCE);
+		assertTrue(Math.abs(0.11 + (1.0/100.0 - 1.0/ 99.0) - newCorrelationScores.get(sevenSunsPref)) < TOLERANCE);
+		assertTrue(Math.abs(0.32 + (2.0/100.0 - 1.0/99.0) - newCorrelationScores.get(xenocidePref)) < TOLERANCE);
 		
 	}
 	
@@ -340,23 +338,23 @@ public class GenerateRecommendationDaemonTest {
 		correlationGraph.putPreference(sevenSunsPref);
 		correlationGraph.putPreference(xenocidePref);
 		
-		Map<Preference, Double> originalCorrelationScores = daemon.calculateCorrelationScores(userProfile, 
+		UserRecommendationCorrelationScores correlationScores = daemon.calculateCorrelationScores(
+				userProfile, 
 				Arrays.asList(harryPotterPref, endersGamePref, sevenSunsPref, xenocidePref), PreferenceCategory.BOOKS);
 
 		UpdatePreferenceRequest req = new UpdatePreferenceRequest(sevenSunsPref);
 		req.updatePopularity(UpdateAction.INC_CORRELATION);
 		req.addCorrelationUpdate(sevenSunsToEg, UpdateAction.INC_CORRELATION);
 		
-		Map<Preference, Double> newCorrelationScores = daemon.getUpdatedPreferenceScores(userProfile, correlationGraph,
-				Arrays.asList(req), 
-				PreferenceCategory.BOOKS, originalCorrelationScores);
+		Map<Preference, Double> newCorrelationScores = correlationScores
+				.applyPreferenceUpdate(req).getCorrelationScores();
 		
 		assertEquals(2, newCorrelationScores.size());
 		
 		assertTrue(newCorrelationScores.containsKey(sevenSunsPref));
 		assertTrue(newCorrelationScores.containsKey(xenocidePref));
 		
-		assertTrue(Math.abs(0.13 - newCorrelationScores.get(sevenSunsPref)) < TOLERANCE);
+		assertTrue(Math.abs(0.11 + (5.0/50.0 - 4.0/50.0) - newCorrelationScores.get(sevenSunsPref)) < TOLERANCE);
 		assertTrue(Math.abs(0.32- newCorrelationScores.get(xenocidePref)) < TOLERANCE);		
 	}
 	
@@ -408,7 +406,7 @@ public class GenerateRecommendationDaemonTest {
 		correlationGraph.putPreference(sevenSunsPref);
 		correlationGraph.putPreference(xenocidePref);
 		
-		Map<Preference, Double> originalCorrelationScores = daemon.calculateCorrelationScores(userProfile, 
+		UserRecommendationCorrelationScores correlationScores = daemon.calculateCorrelationScores(userProfile, 
 				Arrays.asList(harryPotterPref, endersGamePref, sevenSunsPref, xenocidePref), PreferenceCategory.BOOKS);
 
 		UpdatePreferenceRequest req = new UpdatePreferenceRequest(sevenSunsPref);
@@ -417,17 +415,81 @@ public class GenerateRecommendationDaemonTest {
 		req.addCorrelationUpdate(sevenSunsToHP, UpdateAction.DEC_CORRELATION);
 		
 		
-		Map<Preference, Double> newCorrelationScores = daemon.getUpdatedPreferenceScores(userProfile, correlationGraph,
-				Arrays.asList(req), 
-				PreferenceCategory.BOOKS, originalCorrelationScores);
+		Map<Preference, Double> newCorrelationScores = correlationScores
+				.applyPreferenceUpdate(req).getCorrelationScores();
 		
 		assertEquals(2, newCorrelationScores.size());
 		
 		assertTrue(newCorrelationScores.containsKey(sevenSunsPref));
 		assertTrue(newCorrelationScores.containsKey(xenocidePref));
 		
-		assertTrue(Math.abs(0.12 - newCorrelationScores.get(sevenSunsPref)) < TOLERANCE);
+		assertTrue(Math.abs(0.11 + (5.0/50.0 - 4.0/50.0) + (1.0/100.0 - 2.0/100.0) - newCorrelationScores.get(sevenSunsPref)) < TOLERANCE);
 		assertTrue(Math.abs(0.32 - newCorrelationScores.get(xenocidePref)) < TOLERANCE);		
+	}
+	
+	
+	@Test
+	public void testPreferenceUpdateForOriginallyMissingNonUserCorrelation() {
+		
+		Preference harryPotterPref = new Preference("Harry Potter", PreferenceCategory.BOOKS, 100);
+		Preference endersGamePref = new Preference("Ender's Game", PreferenceCategory.BOOKS, 50);
+		
+		Preference xenocidePref = new Preference("Xenocide", PreferenceCategory.BOOKS, 20);
+		
+		
+		PreferenceCorrelation hpToEg = new PreferenceCorrelation(endersGamePref, 10);
+		PreferenceCorrelation egToHp = new PreferenceCorrelation(harryPotterPref, 10);
+		
+		harryPotterPref.addCorrelation(hpToEg);
+		endersGamePref.addCorrelation(egToHp);
+		
+		PreferenceCorrelation hpToXenocide = new PreferenceCorrelation(xenocidePref, 2);
+		harryPotterPref.addAllCorrelations(Arrays.asList(hpToXenocide));
+		
+		PreferenceCorrelation egToXenocide = new PreferenceCorrelation(xenocidePref, 15);
+		endersGamePref.addAllCorrelations(Arrays.asList(egToXenocide));
+		
+		
+		PreferenceCorrelation xenocideToEg = new PreferenceCorrelation(endersGamePref, 15);
+		PreferenceCorrelation xenocideToHP = new PreferenceCorrelation(harryPotterPref, 2);
+		xenocidePref.addAllCorrelations(Arrays.asList(xenocideToEg, xenocideToHP));
+		
+		
+		Map<PreferenceCategory, Set<Preference>> userPreferences = ImmutableMap.of(PreferenceCategory.BOOKS, 
+				ImmutableSet.of(harryPotterPref, endersGamePref));
+		
+		UserProfile userProfile = new UserProfile("bposerow", userPreferences);
+	
+		LocalTransientPreferenceCorrelationGraph correlationGraph = new LocalTransientPreferenceCorrelationGraph();
+		correlationGraph.putPreference(harryPotterPref);
+		correlationGraph.putPreference(endersGamePref);
+		
+		
+		correlationGraph.putPreference(xenocidePref);
+		
+		
+		UserRecommendationCorrelationScores correlationScores = daemon.calculateCorrelationScores(userProfile, 
+				Arrays.asList(harryPotterPref, endersGamePref, xenocidePref), PreferenceCategory.BOOKS);
+	
+		Preference sevenSunsPref = new Preference("Saga of the Seven Suns", PreferenceCategory.BOOKS, 15);
+		
+		UpdatePreferenceRequest req = new UpdatePreferenceRequest(harryPotterPref);
+		req.updatePopularity(UpdateAction.INC_CORRELATION);
+		PreferenceCorrelation hpToSevenSuns = new PreferenceCorrelation(sevenSunsPref, 1);
+		harryPotterPref.addAllCorrelations(Arrays.asList(hpToSevenSuns));
+		
+		req.addCorrelationUpdate(hpToSevenSuns, UpdateAction.INC_CORRELATION);
+		
+		
+		Map<Preference, Double> newCorrelationScores = correlationScores.applyPreferenceUpdate(req).getCorrelationScores();
+		
+		assertTrue(Math.abs(0.32 + (2/100.0 - 2/99.0) - newCorrelationScores.get(xenocidePref)) < TOLERANCE);
+		assertTrue(Math.abs((1.0/100.0) - newCorrelationScores.get(sevenSunsPref)) < TOLERANCE);
+		
+		
+		Optional<Recommendation> recommendation = daemon.getRecommendation(PreferenceCategory.BOOKS, userProfile, correlationGraph);
+		
+		assertEquals(xenocidePref, recommendation.get().getCorrelatedPreference());
 	}
 }
 

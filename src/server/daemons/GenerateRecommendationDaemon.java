@@ -48,7 +48,7 @@ public class GenerateRecommendationDaemon {
 		this.batchSize = batchSize;
 	}
 	
-	Map<Preference, Double> calculateCorrelationScores(UserProfile user,
+	UserRecommendationCorrelationScores calculateCorrelationScores(UserProfile user,
 			List<Preference> preferenceBatch,
 			PreferenceCategory preferenceCategory) {
 		Set<Preference> userPreferences = user.getPreferencesForCategory(preferenceCategory);
@@ -59,7 +59,7 @@ public class GenerateRecommendationDaemon {
 		// Take the sum of the correlation ratios between each pair of user preferences and other candidate preferences.  Sum the
 		//   correlation scores across all user preferences.  Return a map of candidate preference to the sum of the correlation scores for
 		//   that preference.
-		return calculateCorrelationScores(userPreferences, candidatePreferences);
+		return new UserRecommendationCorrelationScores(calculateCorrelationScores(userPreferences, candidatePreferences), user);
 	}
 
 	private Map<Preference, Double> calculateCorrelationScores(
@@ -136,16 +136,16 @@ public class GenerateRecommendationDaemon {
 		Stream<List<Preference>> preferences = StreamUtils.asStream(correlationGraph.batchGetPreferences(preferenceCategory, batchSize));
 		
 		// For each batch, calculate a map of preference to total correlation score
-		Stream<Map<Preference, Double>> prefsToScores = preferences.map(preferenceBatch -> 
+		Stream<UserRecommendationCorrelationScores> prefsToScores = preferences.map(preferenceBatch -> 
 		     calculateCorrelationScores(user, preferenceBatch, preferenceCategory));
 		
-		// This comparator simply orders map entries by correlation score
-		Comparator<Map.Entry<Preference, Double>> entryComparator = (e1, e2) -> (e1.getValue() - e2.getValue()) > 0.0 ? 1 : -1;
+		// This comparator simply orders tuples by correlation score
+		Comparator<Tuple2<Preference, Double>> entryComparator = (e1, e2) -> (e1._2() - e2._2()) > 0.0 ? 1 : -1;
 		
 		
-		Optional<Map.Entry<Preference, Double>> topScoredEntry = prefsToScores
+		Optional<Tuple2<Preference, Double>> topScoredEntry = prefsToScores
 				// For each batch find the map entry with highest correlation score
-				.map(preferenceMap -> getMaxMapEntry(preferenceMap, entryComparator))
+				.map(correlationScores -> correlationScores.getMaxRecommendedPreferenceAndCorrelation())
 				// Filter out empty batches 
 				.filter(optionalEntry -> optionalEntry.isPresent())
 				// Just get the actual map entries from the Optional object
@@ -154,11 +154,12 @@ public class GenerateRecommendationDaemon {
 				.max(entryComparator);
 	    
 		// Finally create a recommendation object out of the map entry with the greatest correlation score
-		return topScoredEntry.map(entry -> new Recommendation(entry.getKey(), user, entry.getValue()));
+		return topScoredEntry.map(tuple -> new Recommendation(tuple._1(), user, tuple._2()));
 	}
 	
+	/*
 	private double getNewCorrelationScore(Double originalScore, double originalWeight, double newWeight, double originalPopularity, double newPopularity) {
-		return (originalScore == null) ? originalWeight/originalPopularity :
+		return (originalScore == null) ? newWeight / newPopularity :
 			(newWeight/newPopularity - originalWeight/originalPopularity) + originalScore;
 	}
 	
@@ -182,7 +183,7 @@ public class GenerateRecommendationDaemon {
 
 	private void handlePreferenceUpdate(UserProfile user,
 			PreferenceCategory preferenceCategory,
-			Map<Preference, Double> newCorrelationScores,
+			Map<Preference, Double> correlationScores,
 			UpdatePreferenceRequest update) {
 		Preference targetPref = update.getPreferenceToUpdate();
 		
@@ -190,44 +191,72 @@ public class GenerateRecommendationDaemon {
 		Map<Preference, UpdateAction> correlationUpdates = update.getCorrelationUpdates().entrySet().stream()
 			       .collect(Collectors.toMap(entry -> entry.getKey().getToPreference(), 
 			    		   entry -> entry.getValue()));
+			
+		Set<PreferenceCorrelation> allCorrelations = update.getPreferenceToUpdate().getCorrelations();
 		
-		
-		
-		for (PreferenceCorrelation prefCorrelation : update.getPreferenceToUpdate().getCorrelations()) {
+		for (PreferenceCorrelation prefCorrelation : allCorrelations) {
 			Preference correlatedPreference = prefCorrelation.getToPreference();
 		
-			double originalWeight = prefCorrelation.getWeight();
+			double newWeight = prefCorrelation.getWeight();
 			
-			double newWeight = correlationUpdates.containsKey(correlatedPreference) ?
-					originalWeight + correlationUpdates.get(correlatedPreference).getDelta() :
-						originalWeight;
-			
-					
+			double originalWeight = getOriginalCorrelationWeight(correlationUpdates,
+					correlatedPreference, newWeight);
+				
 			if (isUserPreference(user, preferenceCategory, targetPref)) {
-				double originalPopularity = targetPref.getPopularity();
-				
-				double newPopularity = originalPopularity + update.getPopularityUpdate().getDelta();
-				
-				if (! isUserPreference(user, preferenceCategory, correlatedPreference)) {
-					newCorrelationScores.compute(correlatedPreference, 
-						(key, value) ->
-				             getNewCorrelationScore(value, originalWeight, newWeight, originalPopularity, newPopularity));
-				}
+				updateCorrelationScoresBasedOnUserPreferenceUpdate(user,
+						preferenceCategory, correlationScores, update,
+						targetPref, correlatedPreference, newWeight,
+						originalWeight);
 
 			} else if (isUserPreference(user, preferenceCategory, correlatedPreference) &&
 					correlationUpdates.containsKey(correlatedPreference)) {
-				double originalPopularity = correlatedPreference.getPopularity();
-				
-				newCorrelationScores.compute(targetPref, 
-						(key, value) -> getNewCorrelationScore(value, originalWeight, newWeight, originalPopularity, originalPopularity));
-			}
+				updateCorrelationScoresBasedOnCorrelatedPreferenceUpdate(
+						correlationScores, targetPref, correlatedPreference,
+						newWeight, originalWeight);
+		   }
 		}
+	}
+
+	private void updateCorrelationScoresBasedOnUserPreferenceUpdate(
+			UserProfile user, PreferenceCategory preferenceCategory,
+			Map<Preference, Double> correlationScores,
+			UpdatePreferenceRequest update, Preference targetPref,
+			Preference correlatedPreference, double newWeight,
+			double originalWeight) {
+		double newPopularity = targetPref.getPopularity();
+		
+		double originalPopularity = newPopularity - update.getPopularityUpdate().getDelta();
+		
+		if (! isUserPreference(user, preferenceCategory, correlatedPreference)) {
+			correlationScores.compute(correlatedPreference, 
+				(key, value) ->
+		             getNewCorrelationScore(value, originalWeight, newWeight, originalPopularity, newPopularity));
+		}
+	}
+
+	private double getOriginalCorrelationWeight(
+			Map<Preference, UpdateAction> correlationUpdates,
+			Preference correlatedPreference, double newWeight) {
+		return correlationUpdates.containsKey(correlatedPreference) ?
+				newWeight - correlationUpdates.get(correlatedPreference).getDelta() :
+					newWeight;
+	}
+
+	private void updateCorrelationScoresBasedOnCorrelatedPreferenceUpdate(
+			Map<Preference, Double> correlationScores, Preference targetPref,
+			Preference correlatedPreference, double newWeight,
+			double originalWeight) {
+		double originalPopularity = correlatedPreference.getPopularity();
+		
+		correlationScores.compute(targetPref, 
+				(key, value) -> getNewCorrelationScore(value, originalWeight, newWeight, originalPopularity, originalPopularity));
 	}
 
 	private boolean isUserPreference(UserProfile user,
 			PreferenceCategory preferenceCategory, Preference targetPref) {
 		return user.getPreferencesForCategory(preferenceCategory).contains(targetPref);
 	}
+	*/
 	
 	/*
 	if (isUserPreference(user, preferenceCategory, targetPref)) {
