@@ -1,5 +1,9 @@
 package data.proxy;
 
+import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Stream;
+
 import data.proxy.request.UpdatePreferenceRequest;
 import data.proxy.request.UpdatePreferenceRequest.UpdateAction;
 import data.structure.Preference;
@@ -16,6 +20,8 @@ public interface PreferenceCorrelationGraph {
      * @return preference
      */
     public Preference getPreference(String id, PreferenceCategory category);
+ 
+    public Iterator<List<Preference>> batchGetPreferences(PreferenceCategory category, int batchSize);
     
     /**
      * Writes a Preference to the graph.
