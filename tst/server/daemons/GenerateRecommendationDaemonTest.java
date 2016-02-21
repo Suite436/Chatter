@@ -187,10 +187,10 @@ public class GenerateRecommendationDaemonTest {
 		
 		Map<Preference, Double> preferenceScores = daemon.calculateCorrelationScores(userProfile, 
 				Arrays.asList(harryPotterPref, endersGamePref, sevenSunsPref, xenocidePref), PreferenceCategory.BOOKS);
-		assertEquals(2, preferenceScores.size());
+		assertEquals(1, preferenceScores.size());
 		
 		assertTrue(Math.abs(0.32 - preferenceScores.get(xenocidePref)) < TOLERANCE);
-		assertTrue(Math.abs(0.0 - preferenceScores.get(sevenSunsPref)) < TOLERANCE);
+		//assertTrue(Math.abs(0.0 - preferenceScores.get(sevenSunsPref)) < TOLERANCE);
 		
 		
 		Optional<Recommendation> recommendation = daemon.getRecommendation(PreferenceCategory.BOOKS, userProfile, correlationGraph);
