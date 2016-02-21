@@ -492,4 +492,3 @@ public class GenerateRecommendationDaemonTest {
 		assertEquals(xenocidePref, recommendation.get().getCorrelatedPreference());
 	}
 }
-
