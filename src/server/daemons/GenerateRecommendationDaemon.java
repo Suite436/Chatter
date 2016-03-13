@@ -2,7 +2,9 @@ package server.daemons;
 
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -13,6 +15,8 @@ import java.util.stream.Stream;
 import util.StreamUtils;
 import util.Tuple2;
 import data.proxy.PreferenceCorrelationGraph;
+import data.proxy.request.UpdatePreferenceRequest;
+import data.proxy.request.UpdatePreferenceRequest.UpdateAction;
 import data.structure.Preference;
 import data.structure.PreferenceCategory;
 import data.structure.PreferenceCorrelation;
@@ -44,7 +48,7 @@ public class GenerateRecommendationDaemon {
 		this.batchSize = batchSize;
 	}
 	
-	Map<Preference, Double> calculateCorrelationScores(UserProfile user,
+	UserRecommendationCorrelationScores calculateCorrelationScores(UserProfile user,
 			List<Preference> preferenceBatch,
 			PreferenceCategory preferenceCategory) {
 		Set<Preference> userPreferences = user.getPreferencesForCategory(preferenceCategory);
@@ -55,7 +59,7 @@ public class GenerateRecommendationDaemon {
 		// Take the sum of the correlation ratios between each pair of user preferences and other candidate preferences.  Sum the
 		//   correlation scores across all user preferences.  Return a map of candidate preference to the sum of the correlation scores for
 		//   that preference.
-		return calculateCorrelationScores(userPreferences, candidatePreferences);
+		return new UserRecommendationCorrelationScores(calculateCorrelationScores(userPreferences, candidatePreferences), user);
 	}
 
 	private Map<Preference, Double> calculateCorrelationScores(
@@ -100,20 +104,6 @@ public class GenerateRecommendationDaemon {
 		return correlation != null ? correlation.getCorrelationRatio(userPref.getPopularity()) : 0.0;
 	}
 	
-
-	/**
-	 * Given a map of preferences to correlation scores, finds the entry in the map with the highest correlation score.  This entry, if it
-	 *   exists, will provide the user recommendation.
-	 * 
-	 * @param correlationScoreMap Map of preferences to their associated correlation scores (with all user preferences).
-	 * @param comparator Used to order the entries of the map by correlation score
-	 * @return The map entry with the maximum correlation score or Optional.empty() if there are no preferences that are correlated with user preferences
-	 */
-	private Optional<Map.Entry<Preference, Double>> getMaxMapEntry(
-			Map<Preference, Double> correlationScoreMap,
-			Comparator<Map.Entry<Preference, Double>> comparator) {
-		return correlationScoreMap.isEmpty() ? Optional.empty() : Optional.of(Collections.max(correlationScoreMap.entrySet(), comparator));
-	}
 	
 	/**
 	 * Find the best preference recommendation, based on correlation score, relative to user preferences.
@@ -132,16 +122,16 @@ public class GenerateRecommendationDaemon {
 		Stream<List<Preference>> preferences = StreamUtils.asStream(correlationGraph.batchGetPreferences(preferenceCategory, batchSize));
 		
 		// For each batch, calculate a map of preference to total correlation score
-		Stream<Map<Preference, Double>> prefsToScores = preferences.map(preferenceBatch -> 
+		Stream<UserRecommendationCorrelationScores> prefsToScores = preferences.map(preferenceBatch -> 
 		     calculateCorrelationScores(user, preferenceBatch, preferenceCategory));
 		
-		// This comparator simply orders map entries by correlation score
-		Comparator<Map.Entry<Preference, Double>> entryComparator = (e1, e2) -> (e1.getValue() - e2.getValue()) > 0.0 ? 1 : -1;
+		// This comparator simply orders tuples by correlation score
+		Comparator<Tuple2<Preference, Double>> entryComparator = (e1, e2) -> (e1._2() - e2._2()) > 0.0 ? 1 : -1;
 		
 		
-		Optional<Map.Entry<Preference, Double>> topScoredEntry = prefsToScores
+		Optional<Tuple2<Preference, Double>> topScoredEntry = prefsToScores
 				// For each batch find the map entry with highest correlation score
-				.map(preferenceMap -> getMaxMapEntry(preferenceMap, entryComparator))
+				.map(correlationScores -> correlationScores.getMaxRecommendedPreferenceAndCorrelation())
 				// Filter out empty batches 
 				.filter(optionalEntry -> optionalEntry.isPresent())
 				// Just get the actual map entries from the Optional object
@@ -150,6 +140,6 @@ public class GenerateRecommendationDaemon {
 				.max(entryComparator);
 	    
 		// Finally create a recommendation object out of the map entry with the greatest correlation score
-		return topScoredEntry.map(entry -> new Recommendation(entry.getKey(), user, entry.getValue()));
+		return topScoredEntry.map(tuple -> new Recommendation(tuple._1(), user, tuple._2()));
 	}
 }
