@@ -76,20 +76,9 @@ public class DDBUpdatePreferenceRequestAdapterTest {
      * Tests that the toDBModel() method cannot be called without first setting the Preference
      * object.
      */
-    @Test
+    @Test(expected = IllegalArgumentException.class)
     public void testMissingObject() {
-        boolean thrown = false;
-        
-        try {
-            DDBUpdatePreferenceRequestAdapter adapter = new DDBUpdatePreferenceRequestAdapter(
-                    (UpdatePreferenceRequest) null);
-        } catch (IllegalArgumentException e) {
-            thrown = true;
-        }
-        
-        assertTrue(
-                "A null UpdatePreferenceRequest object was provided, but no exception was thrown!",
-                thrown);
+        new DDBUpdatePreferenceRequestAdapter((UpdatePreferenceRequest) null);
     }
     
     /**

@@ -1,7 +1,6 @@
 package data.proxy.adapter;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,34 +53,19 @@ public class DDBUserProfileAdapterTest {
     /**
      * Tests that the toObject() method cannot be called without first setting the DynamoDB Item.
      */
-    @Test
+    @Test(expected = IllegalArgumentException.class)
     public void testMissingModel() {
-        boolean thrown = false;
         
-        try {
-            DDBUserProfileAdapter adapter = new DDBUserProfileAdapter((Item) null);
-        } catch (IllegalArgumentException e) {
-            thrown = true;
-        }
-        
-        assertTrue("A null DynamoDB Item was provided, but no exception was thrown!", thrown);
+        new DDBUserProfileAdapter((Item) null);
     }
     
     /**
      * Tests that the toDBModel() method cannot be called without first setting the UserProfile
      * object.
      */
-    @Test
+    @Test(expected = IllegalArgumentException.class)
     public void testMissingObject() {
-        boolean thrown = false;
-        
-        try {
-            DDBUserProfileAdapter adapter = new DDBUserProfileAdapter((UserProfile) null);
-        } catch (IllegalArgumentException e) {
-            thrown = true;
-        }
-        
-        assertTrue("A null UserProfile object was provided, but no exception was thrown!", thrown);
+        new DDBUserProfileAdapter((UserProfile) null);
     }
     
     /**

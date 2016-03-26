@@ -58,19 +58,19 @@ public class UserProfile {
      * @return added preference
      */
     private Preference addPreference(Preference preference) {
-    	PreferenceCategory category = preference.getCategory();
+        PreferenceCategory category = preference.getCategory();
         validatePreference(category, preference.getID());
         if (!this.preferences.containsKey(category)) {
             this.preferences.put(category, new HashSet<Preference>());
         }
-        Preference newPreference = new Preference(preference.getID(), category, 
-        		preference.getPopularity(), preference.getCorrelations());
+        Preference newPreference = new Preference(preference.getID(), category,
+                preference.getPopularity(), preference.getCorrelations());
         this.preferences.get(category).add(newPreference);
         return newPreference;
     }
     
     public Preference addPreference(PreferenceCategory category, String preferenceId) {
-    	return addPreference(new Preference(preferenceId, category));
+        return addPreference(new Preference(preferenceId, category));
     }
     
     /**
@@ -80,7 +80,6 @@ public class UserProfile {
      */
     private void addAllPreferences(Map<PreferenceCategory, Set<Preference>> preferences) {
         for (Entry<PreferenceCategory, Set<Preference>> preferenceCategory : preferences.entrySet()) {
-            PreferenceCategory category = preferenceCategory.getKey();
             for (Preference preference : preferenceCategory.getValue()) {
                 addPreference(preference);
             }

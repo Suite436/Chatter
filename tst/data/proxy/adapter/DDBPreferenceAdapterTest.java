@@ -68,34 +68,18 @@ public class DDBPreferenceAdapterTest {
     /**
      * Tests that the toObject() method cannot be called without first setting the DynamoDB Item.
      */
-    @Test
+    @Test(expected = IllegalArgumentException.class)
     public void testMissingModel() {
-        boolean thrown = false;
-        
-        try {
-            DDBPreferenceAdapter adapter = new DDBPreferenceAdapter((Item) null);
-        } catch (IllegalArgumentException e) {
-            thrown = true;
-        }
-        
-        assertTrue("A null DynamoDB Item was provided, but no exception was thrown!", thrown);
+        new DDBPreferenceAdapter((Item) null);
     }
     
     /**
      * Tests that the toDBModel() method cannot be called without first setting the Preference
      * object.
      */
-    @Test
+    @Test(expected = IllegalArgumentException.class)
     public void testMissingObject() {
-        boolean thrown = false;
-        
-        try {
-            DDBPreferenceAdapter adapter = new DDBPreferenceAdapter((Preference) null);
-        } catch (IllegalArgumentException e) {
-            thrown = true;
-        }
-        
-        assertTrue("A null Preference object was provided, but no exception was thrown!", thrown);
+        new DDBPreferenceAdapter((Preference) null);
     }
     
     /**

@@ -5,11 +5,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import com.google.common.collect.Iterators;
-import com.google.common.collect.UnmodifiableIterator;
 
 import data.proxy.request.UpdatePreferenceRequest;
 import data.proxy.request.UpdatePreferenceRequest.UpdateAction;
@@ -24,7 +22,7 @@ import data.structure.UserProfile;
  */
 public class LocalTransientPreferenceCorrelationGraph implements PreferenceCorrelationGraph {
     
-	private Map<PreferenceCategory, Map<String, Preference>> preferences;
+    private Map<PreferenceCategory, Map<String, Preference>> preferences;
     
     /**
      * Basic default constructor for LocalTransientPreferenceCorrelationGraph.
@@ -134,13 +132,13 @@ public class LocalTransientPreferenceCorrelationGraph implements PreferenceCorre
         
         return out.toString();
     }
-
-	@Override
-	public Iterator<List<Preference>> batchGetPreferences(
-			PreferenceCategory category, int batchSize) {
-		Iterator<List<Preference>> preferenceBatches = Iterators.partition(preferences.get(category).values().iterator(), batchSize);
-		Iterable<List<Preference>> iterable = () -> preferenceBatches;
-		return StreamSupport.stream(iterable.spliterator(), false).iterator();
-	}
+    
+    @Override
+    public Iterator<List<Preference>> batchGetPreferences(PreferenceCategory category, int batchSize) {
+        Iterator<List<Preference>> preferenceBatches = Iterators.partition(preferences
+                .get(category).values().iterator(), batchSize);
+        Iterable<List<Preference>> iterable = () -> preferenceBatches;
+        return StreamSupport.stream(iterable.spliterator(), false).iterator();
+    }
     
 }
